@@ -1,0 +1,19 @@
+{
+  "format": "union-edition",
+  "version": 1,
+  "revision": 0,
+  "updatedAt": "1970-01-01T00:00:00.000Z",
+  "articles": [],
+  "suggestions": [],
+  "votes": [],
+  "reports": [],
+  "settings": {
+    "retainedVotes": 25,
+    "retainedShare": 65,
+    "archivedVotes": 25,
+    "archivedShare": 70,
+    "expiryDays": 60,
+    "retentionDays": 90
+  },
+  "audit": []
+}

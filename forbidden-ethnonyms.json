@@ -1,0 +1,43 @@
+{
+  "note": "Liste de modération uniquement. Ces termes ne sont jamais affichés sur le site public par le code.",
+  "ethnonyms": [
+    "kongo",
+    "bakongo",
+    "lari",
+    "balari",
+    "vili",
+    "bavili",
+    "teke",
+    "bateke",
+    "mbochi",
+    "bambochi",
+    "mboshi",
+    "punu",
+    "bapunu",
+    "sango",
+    "basango",
+    "ngbaka",
+    "makaa",
+    "bembe",
+    "bembé",
+    "kuyu",
+    "bakuyu",
+    "nordiste",
+    "sudiste",
+    "centriste"
+  ],
+  "hateMarkers": [
+    "sale race",
+    "sous-homme",
+    "sous-hommes",
+    "singe",
+    "singes",
+    "esclave",
+    "esclaves",
+    "nettoyage ethnique",
+    "haine",
+    "tuez",
+    "tuer",
+    "mort aux"
+  ]
+}

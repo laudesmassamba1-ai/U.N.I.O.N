@@ -1,0 +1,35 @@
+{
+  "name": "union-nationale-pour-l-unite",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port=3000 --host=0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint:copy": "node scripts/check-copy.mjs",
+    "lint:logo": "node scripts/check-logo.mjs",
+    "lint:privacy": "node scripts/check-privacy.mjs",
+    "lint:motion": "node scripts/check-motion.mjs",
+    "lint:design": "node scripts/check-design.mjs",
+    "lint:edition": "node scripts/edition.mjs check",
+    "edition:publish": "node scripts/edition.mjs publish",
+    "edition:check": "node scripts/edition.mjs check",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm lint:copy && pnpm lint:logo && pnpm lint:privacy && pnpm lint:motion && pnpm lint:design && pnpm lint:edition && pnpm test && pnpm build"
+  },
+  "dependencies": {
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^3.2.4"
+  }
+}
