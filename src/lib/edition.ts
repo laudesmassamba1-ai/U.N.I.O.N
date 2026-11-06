@@ -362,15 +362,14 @@ export function serialiseEdition(document: EditionDocument): string {
   return `${JSON.stringify(document, null, 2)}\n`;
 }
 
-export function downloadEdition(document: EditionDocument): void {
+export function downloadEdition(doc: EditionDocument): void {
   if (typeof window === 'undefined') return;
-  const blob = new Blob([serialiseEdition(document)], { type: 'application/json' });
+  const blob = new Blob([serialiseEdition(doc)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = editionFileName(document.format);
-  link.click();
-  URL.revokeObjectURL(url);
+  link.download = editionFileName(doc.format);
+  link.click();  URL.revokeObjectURL(url);
 }
 
 export async function readEditionFile(file: File): Promise<EditionDocument> {
