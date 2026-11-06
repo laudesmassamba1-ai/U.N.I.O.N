@@ -30,6 +30,7 @@ export const nav = [
   { href: '/journal', label: 'Le journal' },
   { href: '/suggestions', label: 'Boîte à suggestions' },
   { href: '/rejoindre', label: 'Rejoindre' },
+  { href: '/adhesion', label: 'Adhésion' },
 ] as const;
 
 export const footerNav = [
@@ -49,6 +50,7 @@ export const footerNav = [
       { href: '/journal', label: 'Infos de la semaine au Congo' },
       { href: '/suggestions', label: 'Boîte à suggestions' },
       { href: '/rejoindre', label: 'Rejoindre' },
+      { href: '/adhesion', label: 'Adhésion' },
       { href: '/documents', label: 'Documents' },
       { href: '/faq', label: 'Questions fréquentes' },
     ],

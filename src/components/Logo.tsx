@@ -1,3 +1,4 @@
+import logoPath from '../../assets/logo-union.jpg';
 import type { CSSProperties } from 'react';
 
 interface LogoProps {
@@ -18,8 +19,8 @@ export function Logo({ size = 56, onDark = false, className = '', eager = false 
     >
       <img
         className="logo__img"
-        src="/assets/logo-union.jpg"
-        alt="U.N.I.O.N, Union Nationale pour l’Unité"
+        src={logoPath}
+        alt="U.N.I.O.N, Union Nationale pour l'Unité"
         width={1280}
         height={1280}
         decoding="async"
