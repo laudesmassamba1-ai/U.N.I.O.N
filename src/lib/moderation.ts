@@ -1,5 +1,5 @@
-import forbidden from '../../forbidden-ethnonyms.json';
-import { SUGGESTION_MAX, SUGGESTION_MIN } from './suggestions';
+import forbidden from '../../forbidden-ethnonyms.json' with { type: 'json' };
+import { SUGGESTION_MAX, SUGGESTION_MIN } from './suggestions.js';
 
 export type ModerationCode =
   | 'too_short'

@@ -9,9 +9,9 @@ import type {
   SuggestionReport,
   SuggestionSettings,
   SuggestionVote,
-} from '../types';
-import { DEFAULT_SETTINGS } from './suggestions';
-import { nowIso } from './dates';
+} from '../types.js';
+import { DEFAULT_SETTINGS } from './suggestions.js';
+import { nowIso } from './dates.js';
 
 export const EDITION_FORMAT = 'union-edition';
 export const BACKUP_FORMAT = 'union-backup';

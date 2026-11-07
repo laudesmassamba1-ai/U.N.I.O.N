@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { neon, neonConfig, Pool, type PoolClient } from '@neondatabase/serverless';
-import { applyMigrations } from './migrations';
+import { applyMigrations } from './migrations.js';
 
 export type DbRow = Record<string, unknown>;
 

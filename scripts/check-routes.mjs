@@ -72,7 +72,7 @@ if (existsSync(serverFile)) {
   }
 }
 
-// 5. Vercel: /p/:slug must use the share function route, not rely on a rewritten URL
+// 5. Vercel: /p/:slug and /api/* must reach the single function with the path preserved
 const vercelFile = path.join(root, 'vercel.json');
 if (!existsSync(vercelFile)) {
   fail('vercel.json introuvable.');
@@ -85,10 +85,21 @@ if (!existsSync(vercelFile)) {
       typeof rule.source === 'string' &&
       typeof rule.destination === 'string' &&
       /^\/p\//.test(rule.source) &&
-      rule.destination.includes('/api/v1/share/'),
+      rule.destination.includes('__path=v1/share/'),
   );
   if (!shareRewrite) {
-    fail('vercel.json : /p/:slug doit être réécrit vers /api/v1/share/:slug.');
+    fail('vercel.json : /p/:slug doit être réécrit vers /api?__path=v1/share/:slug.');
+  }
+  const apiRewrite = rewrites.find(
+    (rule) =>
+      rule &&
+      typeof rule.source === 'string' &&
+      typeof rule.destination === 'string' &&
+      rule.source.includes('/api/') &&
+      rule.destination.includes('__path='),
+  );
+  if (!apiRewrite) {
+    fail('vercel.json : /api/* doit être réécrit vers /api?__path=... pour conserver le chemin.');
   }
 }
 

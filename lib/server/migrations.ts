@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import type { Database } from './db';
+import type { Database } from './db.js';
 
 const MIGRATIONS_DIR = path.join(process.cwd(), 'drizzle');
 const MIGRATIONS_TABLE = '__union_migrations';

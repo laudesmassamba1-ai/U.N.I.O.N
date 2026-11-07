@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { getDatabase, type Database } from '../lib/server/db';
+import { getDatabase, type Database } from '../lib/server/db.js';
 import {
   checkMemberRateLimit,
   checkRateLimit,
@@ -13,29 +13,29 @@ import {
   isVoteConfigured,
   revokeStudioSession,
   verifyProofOfWork,
-} from './security';
+} from './security.js';
 import {
   validateMemberInput,
   validateReportInput,
   validateSuggestionInput,
   validateVoteInput,
   ValidationException,
-} from './validator';
-import { buildMemberCard, buildMemberDossier, createMemberNumber } from './member-card';
-import { dossierRecipients, isMailConfigured, sendMail } from './mail';
-import { buildHealthReport, DB_STORAGE_LIMIT_BYTES } from './health';
+} from './validator.js';
+import { buildMemberCard, buildMemberDossier, createMemberNumber } from './member-card.js';
+import { dossierRecipients, isMailConfigured, sendMail } from './mail.js';
+import { buildHealthReport, DB_STORAGE_LIMIT_BYTES } from './health.js';
 import {
   createSnapshotState,
   loadSnapshot,
   rebuildSnapshot,
   SNAPSHOT_CACHE_CONTROL,
   snapshotUpdatedAt,
-} from './snapshot';
-import { createSnapshotSource } from './snapshot-source';
-import { classifyDatabaseError, degradedResponse, withDbRetry, withTimeout } from './resilience';
-import { requestWarm, WARM_MIN_TEXT_LENGTH } from './warm';
-import { analyseSuggestion } from '../src/lib/moderation';
-import { DEFAULT_SETTINGS, evaluateStatus } from '../src/lib/suggestions';
+} from './snapshot.js';
+import { createSnapshotSource } from './snapshot-source.js';
+import { classifyDatabaseError, degradedResponse, withDbRetry, withTimeout } from './resilience.js';
+import { requestWarm, WARM_MIN_TEXT_LENGTH } from './warm.js';
+import { analyseSuggestion } from '../src/lib/moderation.js';
+import { DEFAULT_SETTINGS, evaluateStatus } from '../src/lib/suggestions.js';
 
 export interface RequestContext {
   req: IncomingMessage;

@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { createObjectStore, type ObjectStore } from '../lib/server/objectStore';
-import type { SnapshotSource } from './snapshot';
+import { createObjectStore, type ObjectStore } from '../lib/server/objectStore.js';
+import type { SnapshotSource } from './snapshot.js';
 
 /**
  * Développement et tests : un fichier hors du dépôt (data/ est ignoré).

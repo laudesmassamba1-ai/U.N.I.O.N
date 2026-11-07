@@ -2,6 +2,7 @@ node_modules/
 build/
 dist/
 coverage/
+.vercel/
 .DS_Store
 *.log
 .env*
@@ -19,3 +20,4 @@ data/*.sqlite-*
 # Instantané public local et sauvegardes (jamais versionnés)
 data/edition.snapshot.json
 data/backups/
+.vercel

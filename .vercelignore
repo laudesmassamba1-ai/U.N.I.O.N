@@ -1,0 +1,8 @@
+.env*
+!.env.example
+.vercel/
+/data/
+tests/
+coverage/
+dist/
+*.log

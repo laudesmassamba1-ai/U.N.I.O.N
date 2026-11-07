@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { parseEditionDocument, type EditionDocument } from '../src/lib/edition';
+import { parseEditionDocument, type EditionDocument } from '../src/lib/edition.js';
 
 /**
  * Instantané public de l’édition.

@@ -1,4 +1,4 @@
-import type { SuggestionSettings } from '../types';
+import type { SuggestionSettings } from '../types.js';
 
 export const DEFAULT_SETTINGS: SuggestionSettings = {
   retainedVotes: 25,
