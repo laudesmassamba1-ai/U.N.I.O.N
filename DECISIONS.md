@@ -57,7 +57,7 @@ Une édition publique conserve les suggestions locales encore en attente ainsi q
 - Trois essais sur erreur de réveil (0, 700, 1 500 ms) dans un budget de 8 s ; jamais sur validation ou contrainte. Quota épuisé : dix minutes de répit et réponse 503 avec le texte conservé localement.
 - La sonde courte `/api/health` ne touche jamais la base ; `?deep=1` exige `HEALTH_SECRET`.
 - Le panneau de santé du Studio lit la taille de la base, l’âge de l’instantané et la dernière sauvegarde (`backup_log`), avec alertes à 70 %, 85 % et blocage doux à 95 %.
-- Le moteur reste SQLite : le portage Neon/PostgreSQL n’est pas fait. La couche ci-dessus est écrite pour ne pas dépendre du moteur, mais `DATABASE_URL` n’est encore lue par personne. Ne pas déployer sur Vercel en croyant que la base est persistante.
+- Le moteur reste SQLite pour les routes existantes. Le socle Neon est ajouté séparément : schéma Drizzle, migration générée, clients `app_public`/`app_studio`, rôles minimaux, preuve réelle prête. Il n’est pas branché, faute de session Neon autorisée ; `DATABASE_URL` n’est lue que par les migrations et les scripts. Ne pas déployer sur Vercel en croyant que la base est persistante.
 - Sauvegardes : workflow quotidien chiffré par `age` vers un stockage privé, rétention 8 quotidiennes et 3 mensuelles, test de restauration mensuel dans un PostgreSQL éphémère. La clé privée reste hors ligne.
 
 ## Carte de membre par e-mail

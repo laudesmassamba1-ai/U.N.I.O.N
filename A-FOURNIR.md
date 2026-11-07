@@ -1,5 +1,7 @@
 # Informations à fournir par le bureau
 
+> **Avant toute mise en ligne publique :** changer le mot de passe de `neondb_owner` (console Neon, Roles & Databases, Reset password), puis mettre à jour `.env.local` et les variables Vercel. Ce mot de passe a été vu dans une conversation. Poser ensuite `OWNER_PASSWORD_ROTATED=true` dans `.env.local` : tant que la variable est absente, `pnpm check-secrets` rappelle la consigne à chaque exécution.
+
 Les éléments suivants ne peuvent pas être inventés. Tant qu’ils manquent, le site affiche un texte d’attente explicite.
 
 ## Identité et statut
@@ -11,6 +13,8 @@ Les éléments suivants ne peuvent pas être inventés. Tant qu’ils manquent, 
 - Adresse du siège, si elle est publique.
 - Nom de domaine et hébergeur définitifs.
 - Accès à une base PostgreSQL persistante pour la production, et validation du mode de déploiement.
+- Connexion Neon autorisée (`neon login`) ou chaînes de connexion déposées directement dans `.env.local`, jamais dans la conversation.
+- Projet Vercel et domaine définitif.
 - Secrets de production `STUDIO_SECRET` et `VOTE_SECRET`, générés puis conservés hors du dépôt.
 
 ## Programme

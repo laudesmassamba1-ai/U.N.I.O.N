@@ -32,7 +32,10 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: auto
       AGE_TEST_PRIVATE_KEY: ${{ secrets.AGE_TEST_PRIVATE_KEY }}
-      TARGET: postgres://postgres:test@localhost:5432/restore
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: test
+      PGDATABASE: restore
     steps:
       - name: Vérifier la clé de test
         run: |
@@ -69,12 +72,12 @@ jobs:
           printf '%s\n' "$AGE_TEST_PRIVATE_KEY" > test-key.txt
           chmod 600 test-key.txt
           age --decrypt --identity test-key.txt --output latest.dump latest.dump.age
-          pg_restore --no-owner --no-privileges --dbname "$TARGET" latest.dump
+          pg_restore --no-owner --no-privileges latest.dump
           rm -f test-key.txt latest.dump
 
       - name: Comparer les nombres de lignes
         run: |
-          psql "$TARGET" -At -v ON_ERROR_STOP=1 -c "
+          psql -At -v ON_ERROR_STOP=1 -c "
             SELECT json_build_object(
               'articles', (SELECT count(*) FROM articles),
               'suggestions', (SELECT count(*) FROM suggestions),

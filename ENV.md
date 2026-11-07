@@ -24,8 +24,18 @@ Trois lieux seulement : le navigateur au build, l’API sur Vercel, les workflow
 | `MAIL_API_KEY` | clé du service d’envoi | oui |
 | `MAIL_API_URL` | point d’envoi (Resend par défaut) | non |
 | `MEMBER_FROM_EMAIL` | expéditeur vérifié | non |
-| `DATABASE_URL` | chaîne pooler Neon, quand le portage sera fait | oui |
-| `DATABASE_URL_READONLY` | rôle lecture seule, sauvegardes | oui |
+| `DATABASE_URL` | connexion directe du propriétaire, migrations seulement | oui |
+| `DATABASE_URL_POOLED` | pooler du propriétaire, dépannage local | oui |
+| `DATABASE_URL_APP` | pooler, rôle `app_public`, API publique | oui |
+| `DATABASE_URL_STUDIO` | pooler, rôle `app_studio`, Studio | oui |
+| `DATABASE_URL_BACKUP_RO` | direct, rôle `backup_ro`, GitHub Actions seulement | oui |
+| `VOTE_HMAC_SECRET` | empreinte des jetons de vote | oui |
+| `SESSION_SECRET` | signature des sessions du Studio | oui |
+| `REVALIDATE_SECRET`, `CRON_SECRET` | appels internes et tâche planifiée | oui |
+| `OBJECT_STORE_*` | endpoint, seau, clés, URL publique | oui |
+| `BACKUP_AGE_PUBLIC_KEY` | chiffrement des sauvegardes | non (clé publique) |
+| `PUBLIC_SITE_URL` | URL absolue du site | non |
+| `DATABASE_URL_READONLY` | ancien nom du rôle lecture seule (workflows actuels) | oui |
 | `SNAPSHOT_URL` | objet public de l’instantané | non |
 | `SNAPSHOT_WRITE_URL` | URL de put signée pour publier l’instantané | oui |
 | `SNAPSHOT_PATH` | fichier local de développement | non |

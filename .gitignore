@@ -7,6 +7,10 @@ coverage/
 .env*
 !.env.example
 
+# Fichiers générés par la CLI Neon (peuvent contenir une chaîne de connexion)
+.neon/
+/neon.ts
+
 # Base SQLite locale et fichiers WAL/SHM
 data/*.sqlite
 data/*.sqlite-*

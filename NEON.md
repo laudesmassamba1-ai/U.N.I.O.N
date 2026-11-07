@@ -4,13 +4,16 @@ Annexe de `SKILL.md`, section 5. La cible reste **PostgreSQL sur Neon (plan grat
 
 ## État réel
 
-Le serveur livré ouvre **SQLite** (`server/db.ts`, `node:sqlite`), pas Neon. Les routes, le schéma et les tests sont écrits pour ce moteur. En conséquence :
+Le serveur livré ouvre encore **SQLite** (`server/db.ts`, `node:sqlite`) pour ses routes. La base Neon est préparée, pas branchée :
 
-- les limites de Neon ne s’appliquent pas encore, puisque aucune base Neon n’est appelée ;
-- la couche de survie décrite ici est **déjà active** et testée, indépendamment du moteur ;
-- le portage du pilote (`@neondatabase/serverless` + `drizzle-orm/neon-http`) et la traduction des requêtes restent le préalable à la mise en production sur Vercel. Aucun adaptateur PostgreSQL n’est écrit à ce jour.
+- `lib/server/schema.ts` décrit les 13 tables PostgreSQL de référence ;
+- `drizzle/0000_tan_puck.sql` est la migration générée, avec les contraintes de texte, de statut, de valeur de vote et la ligne unique d’instantané ;
+- `tests/neon-schema.test.ts` applique cette migration dans PGlite et vérifie les contraintes, sans consommer de calcul Neon ;
+- `lib/server/db.ts` crée deux clients HTTP (`app_public`, `app_studio`) et `lib/server/retry.ts` porte les trois essais ;
+- `scripts/db-roles.sql` et `scripts/db-roles.mjs` créent les rôles limités sans afficher leurs mots de passe ;
+- `scripts/prove-neon.ts` fera la preuve réelle quand la connexion existera.
 
-Tant que ce portage n’est pas fait, `DATABASE_URL` n’est pas lue par le code. La déclarer ne change rien.
+Ce qui bloque aujourd’hui : **aucune connexion Neon n’est configurée** (pas de `DATABASE_URL*` dans `.env.local`, CLI absente, pas de session autorisée). Les migrations ne sont donc pas appliquées sur Neon et les routes ne lisent pas PostgreSQL. La couche de survie décrite ci-dessous (instantané, réveil, quota, sauvegardes) est déjà active et testée, indépendamment du moteur.
 
 ## 1. Limites visées
 
@@ -86,6 +89,16 @@ Le contrat `SnapshotSource` permet de changer de fournisseur sans toucher à l�
 ## 9. Écriture regroupée
 
 `WRITE_MODE=direct|buffered` est documenté et réservé. **Aucune file n’est implémentée** : passer à `buffered` n’a aujourd’hui aucun effet. Le déclencheur est explicite : consommation au-delà de 60 % du quota avant le 20 du mois. La mise en œuvre prévue est une file Redis (Upstash) vidée toutes les 15 minutes, avec affichage immédiat du vote. Voir `BUDGET-NEON.md`.
+
+## 9 bis. Ce qui reste à faire après la connexion
+
+1. `neon login` par la personne, ou dépôt des chaînes dans `.env.local` (jamais dans la conversation).
+2. `pnpm db:migrate` avec `DATABASE_URL` (connexion directe du propriétaire).
+3. `pnpm db:roles` puis `pnpm db:seed`.
+4. `pnpm prove:neon` (écrit puis supprime ses lignes de test).
+5. Portage des routes vers `lib/server/handlers` et création des fonctions Vercel (`api/v1/*`, `api/cron/daily`).
+6. Renseigner les variables Vercel, créer le stockage d’objets et la clé `age`.
+7. Brancher le workflow de sauvegarde sur `DATABASE_URL_BACKUP_RO`.
 
 ## 10. Exploitation
 

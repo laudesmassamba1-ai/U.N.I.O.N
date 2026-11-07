@@ -8,6 +8,13 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:check": "drizzle-kit check",
+    "db:seed": "node scripts/seed-settings.mjs",
+    "db:roles": "node scripts/db-roles.mjs",
+    "prove:neon": "node --experimental-strip-types scripts/prove-neon.ts --confirm",
     "lint:copy": "node scripts/check-copy.mjs",
     "lint:logo": "node scripts/check-logo.mjs",
     "lint:privacy": "node scripts/check-privacy.mjs",
@@ -18,17 +25,24 @@
     "edition:publish": "node scripts/edition.mjs publish",
     "edition:check": "node scripts/edition.mjs check",
     "test": "vitest run",
-    "check": "pnpm typecheck && pnpm lint:copy && pnpm lint:logo && pnpm lint:privacy && pnpm lint:routes && pnpm lint:motion && pnpm lint:design && pnpm lint:edition && pnpm test && pnpm build"
+    "check": "pnpm check:secrets && pnpm typecheck && pnpm lint:copy && pnpm lint:logo && pnpm lint:privacy && pnpm lint:routes && pnpm lint:motion && pnpm lint:design && pnpm lint:edition && pnpm test && pnpm build"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
+    "aws4fetch": "^1.0.20",
+    "drizzle-orm": "^0.45.4",
     "react": "^19.0.1",
-    "react-dom": "^19.0.1"
+    "react-dom": "^19.0.1",
+    "ulidx": "^2.4.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.15",
     "@types/node": "^22.14.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "drizzle-kit": "^0.31.11",
     "typescript": "^7.0.2",
     "vite": "^8.3.0",
     "vitest": "^3.2.4"

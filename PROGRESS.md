@@ -9,6 +9,9 @@
 - Journal hebdomadaire avec éditions, brouillons, publication, dépublication, archivage, suppression douce et restauration.
 - Studio avec éditeur de blocs, image redimensionnée sans EXIF, sources, autosauvegarde, révisions, modération, réponses, fusion de doublons, seuils et journal d’audit.
 - Boîte à suggestions anonyme : limite de 2 dépôts par heure, preuve de travail, modération, votes, signalements, statuts.
+- Neon : schéma Drizzle PostgreSQL (13 tables, contraintes de longueur, de statut, de vote et d’instantané unique), migration `drizzle/0000_tan_puck.sql` générée et rejouée dans PGlite, clients HTTP `app_public`/`app_studio`, rôles à droits minimaux et script de preuve réelle prêts.
+- Sécurité : `check-secrets` ajouté à `pnpm check`, rappel de rotation du mot de passe `neondb_owner`, `.neon/` et `neon.ts` ignorés.
+- Blocage : aucune connexion Neon configurée, donc migrations non appliquées et routes encore sur SQLite.
 - Lectures publiques : `/api/v1/edition` sert un instantané en mémoire ou sur stockage, avec cache CDN long, ETag et repli sur l’ancien instantané quand la base ne répond pas. Un test vérifie que dix lectures ne construisent qu’une fois.
 - Écritures : validation et preuve de calcul avant tout accès à la base, trois essais sur réveil, quota traité séparément avec dix minutes de répit, réponse 503 explicite et brouillon local conservé.
 - Exploitation : `GET /api/health` sans base, `?deep=1` protégé par `HEALTH_SECRET`, `GET /api/v1/studio/health` pour la taille de la base et la dernière sauvegarde, `POST /api/v1/warm` limité à dix minutes.
