@@ -60,9 +60,9 @@ Une édition publique conserve les suggestions locales encore en attente ainsi q
 - Le runtime serveur utilise PostgreSQL sur Neon quand `DATABASE_URL_APP`/`DATABASE_URL_STUDIO` sont présentes, et une seule base PGlite partagée en développement/test. Le schéma Drizzle, la migration, le seed et les trois rôles sont appliqués sur la base Neon de Londres ; la preuve réelle est repassée. Le mot de passe propriétaire exposé a été remplacé et `OWNER_PASSWORD_ROTATED=true` est posé localement ; il reste à le reporter dans Vercel. Le cron quotidien et le routage catch-all sont écrits, mais le déploiement Vercel n’est pas encore fait.
 - Sauvegardes : workflow quotidien chiffré par `age` vers un stockage privé, rétention 8 quotidiennes et 3 mensuelles, test de restauration mensuel dans un PostgreSQL éphémère. La clé privée reste hors ligne.
 
-## 13. Stockage d’objets : Cloudflare R2
+## 13. Stockage d’objets : Vercel Blob
 
-R2 est retenu pour les deux seaux : 10 Go-mois gratuits, egress nul, API S3 compatible et domaine personnalisé pour le seau public. Le seau `union-public` sert l’instantané et les images ; `union-backups` reste privé et ne contient que des dumps chiffrés par `age`. Backblaze B2 reste le repli si R2 devient indisponible. La clé privée `age` est générée localement, ignorée par Git, puis conservée hors ligne ; seule la clé publique va dans GitHub.
+Vercel Blob est retenu : il est inclus dans le plan Hobby gratuit, ne demande aucun compte supplémentaire et le CLI Vercel déjà authentifié crée les deux Blob. `union-public` sert l’instantané et les images ; `union-backups` reste privé et ne contient que des dumps chiffrés par `age`. R2 a été écarté parce que son activation exige un moyen de paiement dans le tableau de bord Cloudflare ; B2 aurait demandé une inscription et une vérification d’e-mail. En local, le Blob public utilise `BLOB_PUBLIC_READ_WRITE_TOKEN` et le privé `BLOB_PRIVATE_READ_WRITE_TOKEN` ; sur Vercel, le public s’appelle `BLOB_READ_WRITE_TOKEN`. La clé privée `age` est générée localement, ignorée par Git, puis conservée hors ligne ; seule la clé publique va dans GitHub.
 
 ## Carte de membre par e-mail
 

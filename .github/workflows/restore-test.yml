@@ -26,23 +26,38 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
-      BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
-      AWS_DEFAULT_REGION: auto
+      BLOB_PRIVATE_READ_WRITE_TOKEN: ${{ secrets.BLOB_PRIVATE_READ_WRITE_TOKEN }}
       AGE_TEST_PRIVATE_KEY: ${{ secrets.AGE_TEST_PRIVATE_KEY }}
       PGHOST: localhost
       PGUSER: postgres
       PGPASSWORD: test
       PGDATABASE: restore
     steps:
-      - name: Vérifier la clé de test
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enable Corepack and install pnpm
         run: |
-          if [ -z "$AGE_TEST_PRIVATE_KEY" ]; then
-            echo "::error::AGE_TEST_PRIVATE_KEY manquante. Le test de restauration ne peut pas tourner."
-            exit 1
-          fi
+          corepack enable
+          corepack prepare pnpm@latest --activate
+          pnpm --version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Vérifier les secrets
+        run: |
+          for name in BLOB_PRIVATE_READ_WRITE_TOKEN AGE_TEST_PRIVATE_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name manquant. Voir ENV.md."
+              exit 1
+            fi
+          done
 
       - name: Installer les outils
         run: |
@@ -52,19 +67,16 @@ jobs:
 
       - name: Télécharger la dernière sauvegarde
         run: |
-          key=$(aws s3 ls "s3://$BACKUP_S3_BUCKET/backups/" \
-            --endpoint-url "$BACKUP_S3_ENDPOINT" \
-            | awk '{ print $4 }' | grep '\.dump\.age$' | sort | tail -1)
+          key=$(node scripts/blob-store.mjs list backups/ \
+            | grep '\.dump\.age$' | sort | tail -1)
           if [ -z "$key" ]; then
             echo "::error::Aucune sauvegarde trouvée dans backups/."
             exit 1
           fi
           echo "Dernière sauvegarde : $key"
-          aws s3 cp "s3://$BACKUP_S3_BUCKET/backups/$key" latest.dump.age \
-            --endpoint-url "$BACKUP_S3_ENDPOINT"
+          node scripts/blob-store.mjs get "$key" latest.dump.age
           counts_key="${key%.dump.age}.counts.json"
-          aws s3 cp "s3://$BACKUP_S3_BUCKET/backups/$counts_key" counts.json \
-            --endpoint-url "$BACKUP_S3_ENDPOINT"
+          node scripts/blob-store.mjs get "$counts_key" counts.json
           echo "counts.json : $(cat counts.json)"
 
       - name: Déchiffrer et restaurer

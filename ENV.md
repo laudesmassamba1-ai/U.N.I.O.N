@@ -32,11 +32,12 @@ Trois lieux seulement : le navigateur au build, l’API sur Vercel, les workflow
 | `DATABASE_URL_STUDIO` | pooler, rôle `app_studio`, Studio | oui |
 | `DATABASE_URL_BACKUP_RO` | direct, rôle `backup_ro`, GitHub Actions seulement | oui |
 | `REVALIDATE_SECRET`, `CRON_SECRET` | appels internes et tâche planifiée | oui |
-| `OBJECT_STORE_*` | endpoint, seau, clés, URL publique | oui |
+| `BLOB_READ_WRITE_TOKEN`, `BLOB_PUBLIC_READ_WRITE_TOKEN` | jeton du Blob public (instantané) ; le nom préfixé sert au développement local | oui |
+| `BLOB_PRIVATE_READ_WRITE_TOKEN` | jeton du Blob privé des sauvegardes | oui |
 | `BACKUP_AGE_PUBLIC_KEY` | chiffrement des sauvegardes | non (clé publique) |
 | `PUBLIC_SITE_URL` | URL absolue du site | non |
 | `SNAPSHOT_URL` | objet public de l’instantané | non |
-| `SNAPSHOT_WRITE_URL` | URL de put signée de repli ; l’écriture normale passe par `OBJECT_STORE_*` | oui |
+| `SNAPSHOT_WRITE_URL` | URL de put signée de repli ; l’écriture normale passe par Vercel Blob | oui |
 | `SNAPSHOT_KEY` | clé de l’objet dans le seau public, `edition.json` par défaut | non |
 | `SNAPSHOT_PATH` | fichier local de développement | non |
 | `WRITE_MODE` | `direct` (défaut) ou `buffered` (réservé) | non |
@@ -46,8 +47,7 @@ Trois lieux seulement : le navigateur au build, l’API sur Vercel, les workflow
 | Nom | Rôle |
 | --- | --- |
 | `DATABASE_URL_BACKUP_RO` | dump, comptage des lignes et journal `backup_log` |
-| `BACKUP_S3_ENDPOINT`, `BACKUP_S3_BUCKET` | destination des sauvegardes |
-| `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY` | accès au compartiment privé |
+| `BLOB_PRIVATE_READ_WRITE_TOKEN` | accès au Blob privé des sauvegardes |
 | `AGE_PUBLIC_KEY` | chiffrement des sauvegardes |
 | `AGE_TEST_PRIVATE_KEY` | test mensuel de restauration, clé de test uniquement |
 | `HEALTH_SECRET` (variable) | contrôle de santé après déploiement, facultatif |

@@ -5,8 +5,8 @@ import type { SnapshotSource } from './snapshot.js';
 
 /**
  * Développement et tests : un fichier hors du dépôt (data/ est ignoré).
- * Production : SNAPSHOT_URL pointe l’objet public servi par le CDN et
- * l’écriture passe par le seau R2 (ou une URL de put signée en repli).
+ * Production : SNAPSHOT_URL pointe l’objet public Vercel Blob et
+ * l’écriture passe par le Blob public (ou une URL de put signée en repli).
  */
 export class FileSnapshotSource implements SnapshotSource {
   constructor(readonly file: string) {}

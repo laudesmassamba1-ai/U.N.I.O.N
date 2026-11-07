@@ -6,7 +6,7 @@ Objectif : remettre le site en ligne sur un projet Neon neuf **en moins d’une 
 
 - un ordinateur avec `age`, `psql` et `pg_restore` (version majeure identique au serveur) ;
 - la clé privée `age` du fondateur, conservée hors ligne (gestionnaire de mots de passe et copie imprimée). La paire générée localement se trouve dans `data/backups/age/` (ignoré par Git) : déplacer `union.key` hors ligne après copie, ne jamais la versionner ;
-- l’accès au compartiment de sauvegarde (`backups/`) ;
+- l’accès au Blob privé (`backups/`) et le jeton `BLOB_PRIVATE_READ_WRITE_TOKEN`, à garder hors du dépôt ;
 - un compte Neon et un projet vide, dans la même région que l’ancien.
 
 La clé privée ne doit jamais être copiée sur le serveur, dans GitHub, ni dans le dépôt.
@@ -21,12 +21,12 @@ Exemple : `16.4`. Installez la même version majeure du client.
 
 ## 2. Récupérer la dernière sauvegarde
 
+Depuis la racine du dépôt, avec les dépendances installées (`pnpm install`) :
+
 ```bash
-aws s3 ls "s3://$BACKUP_S3_BUCKET/backups/" --endpoint-url "$BACKUP_S3_ENDPOINT" | sort | tail -5
-aws s3 cp "s3://$BACKUP_S3_BUCKET/backups/union-AAAA-MM-JJ.dump.age" . \
-  --endpoint-url "$BACKUP_S3_ENDPOINT"
-aws s3 cp "s3://$BACKUP_S3_BUCKET/backups/union-AAAA-MM-JJ.counts.json" . \
-  --endpoint-url "$BACKUP_S3_ENDPOINT"
+node --env-file-if-exists=.env.local scripts/blob-store.mjs list backups/ | sort | tail -5
+node --env-file-if-exists=.env.local scripts/blob-store.mjs get "backups/union-AAAA-MM-JJ.dump.age" union-AAAA-MM-JJ.dump.age
+node --env-file-if-exists=.env.local scripts/blob-store.mjs get "backups/union-AAAA-MM-JJ.counts.json" union-AAAA-MM-JJ.counts.json
 sha256sum union-AAAA-MM-JJ.dump.age
 ```
 

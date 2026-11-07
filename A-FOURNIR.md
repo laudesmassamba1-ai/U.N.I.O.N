@@ -51,7 +51,7 @@ Les éléments suivants ne peuvent pas être inventés. Tant qu’ils manquent, 
 - Compte Neon et région choisie, identique à celle des fonctions Vercel.
 - Chaîne de connexion « pooler » pour l’API, et chaîne d’un rôle **lecture seule** pour les sauvegardes.
 - Projet Vercel et domaine définitif.
-- Compte Cloudflare R2 avec un jeton S3 : seau public `union-public` (instantané et images, domaine personnalisé), seau privé `union-backups` (dumps chiffrés).
+- Stockage Vercel Blob : `union-public` (instantané et images) et `union-backups` (dumps chiffrés) sont créés dans le projet Vercel, et le jeton privé est posé dans les secrets GitHub (`BLOB_PRIVATE_READ_WRITE_TOKEN`).
 - Paire de clés `age` : la clé publique est dans `.env.local` et doit être recopiée dans le secret GitHub `AGE_PUBLIC_KEY` ; la clé privée `data/backups/age/union.key` doit être déplacée hors ligne (gestionnaire de mots de passe et copie imprimée), jamais dans le dépôt.
 - `HEALTH_SECRET` généré, et décision sur la publication de la consommation mensuelle.
 - Confirmation du budget accepté (100 CU-heures) et du seuil de bascule vers l’écriture regroupée.

@@ -33,6 +33,8 @@ Le site est servi sur `http://localhost:3000`.
 | `SESSION_SECRET` | Obligatoire pour ouvrir une session Studio. 32 caractères minimum. `STUDIO_SECRET` reste accepté (16 caractères minimum). Ne jamais exposer avec un préfixe `VITE_`. |
 | `VOTE_HMAC_SECRET` | Secret HMAC des empreintes de vote. 32 caractères minimum. `VOTE_SECRET` reste accepté. Obligatoire en production, sinon l’API refuse les votes avec un code 503. |
 | `DATABASE_URL_APP`, `DATABASE_URL_STUDIO`, `DATABASE_URL_BACKUP_RO` | Chaînes Neon limitées par rôle. `DATABASE_URL` propriétaire sert uniquement aux migrations. |
+| `BLOB_READ_WRITE_TOKEN` | Jeton du Blob public Vercel pour l’instantané. En local : `BLOB_PUBLIC_READ_WRITE_TOKEN`. |
+| `BLOB_PRIVATE_READ_WRITE_TOKEN` | Jeton du Blob privé des sauvegardes, réservé aux workflows. |
 | `PGLITE_PATH` | Chemin de la base PGlite locale. Par défaut `data/pglite` ; `PGLITE_MEMORY=1` force la mémoire. |
 | `VITE_SITE_URL` | Origine publique absolue, sans slash final. Sert à l’image Open Graph et au partage. Remplacer par le domaine définitif. |
 | `VITE_WHATSAPP_URL` | Lien d’invitation au groupe WhatsApp. Vide : les boutons sont masqués. |
@@ -74,7 +76,7 @@ Les routes Studio exigent la session serveur. Les suggestions anonymes exigent u
 
 ## Déploiement
 
-Le fichier `vercel.json` route toutes les requêtes `/api/*` vers `api/[...path].ts` et planifie `/api/cron/daily`. La production utilise PostgreSQL sur Neon, avec `DATABASE_URL_APP` pour l’API et `DATABASE_URL_STUDIO` pour le Studio. Le déploiement Vercel et la création des seaux R2 restent à faire.
+Le fichier `vercel.json` route toutes les requêtes `/api/*` vers `api/index.ts` et planifie `/api/cron/daily`. La production utilise PostgreSQL sur Neon, avec `DATABASE_URL_APP` pour l’API et `DATABASE_URL_STUDIO` pour le Studio. Les deux Blob Vercel (`union-public`, `union-backups`) sont créés ; le jeton privé reste à ajouter aux secrets GitHub.
 
 Il faut aussi fournir `SESSION_SECRET`, `VOTE_HMAC_SECRET` et un stockage d’objets. Sans cela, le site peut être consulté, mais le Studio et les écritures ne doivent pas être considérés comme prêts pour la production.
 

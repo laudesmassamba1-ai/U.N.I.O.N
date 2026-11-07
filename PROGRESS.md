@@ -11,12 +11,12 @@
 - Boîte à suggestions anonyme : limite de 2 dépôts par heure, preuve de travail, modération, votes, signalements, statuts.
 - Neon : schéma Drizzle PostgreSQL (14 tables, contraintes de longueur, de statut, de vote et d’instantané unique), migration `drizzle/0000_union.sql` et seed `0001_seed.sql` appliqués sur le projet de Londres, rôles `app_public`/`app_studio`/`backup_ro` créés, preuve réelle repassée.
 - Sécurité : `check-secrets` ajouté à `pnpm check`, rappel de rotation du mot de passe `neondb_owner`, `.neon/` et `neon.ts` ignorés.
-- Reste : report de la rotation dans Vercel, création des seaux R2, premier essai des sauvegardes et déploiement Vercel.
+- Reste : report de la rotation dans Vercel, premier essai des sauvegardes et vérification du déploiement.
 - Lectures publiques : `/api/v1/edition` sert un instantané en mémoire ou sur stockage, avec cache CDN long, ETag et repli sur l’ancien instantané quand la base ne répond pas. Un test vérifie que dix lectures ne construisent qu’une fois.
 - Écritures : validation et preuve de calcul avant tout accès à la base, trois essais sur réveil, quota traité séparément avec dix minutes de répit, réponse 503 explicite et brouillon local conservé.
 - Exploitation : `GET /api/health` sans base, `?deep=1` protégé par `HEALTH_SECRET`, `GET /api/v1/studio/health` pour la taille de la base et la dernière sauvegarde, `POST /api/v1/warm` limité à dix minutes.
 - Sauvegardes : `backup_log`, workflow quotidien chiffré et workflow mensuel de restauration ; `backup_ro` peut journaliser une sauvegarde sans accéder au reste. Base de production PostgreSQL sur Neon configurée ; déploiement Vercel à faire.
-- Exploitation : cron quotidien `/api/cron/daily` protégé par `CRON_SECRET`, routage Vercel `api/[...path].ts`, écriture directe de l’instantané vers R2.
+- Exploitation : cron quotidien `/api/cron/daily` protégé par `CRON_SECRET`, routage Vercel `api/index.ts`, écriture directe de l’instantané vers Vercel Blob.
 - Typographie : une seule requête de polices, graisse 800 de Bitter réellement chargée, chiffres tabulaires, veuves évitées, thème appliqué avant le premier rendu.
 - Interface : filet de lecture en haut de page, en-têtes d’ancrage sous l’en-tête fixe, focus rendu au contenu après chaque navigation.
 - Mouvement : tampons posés à l’entrée dans le champ, joint de la jonction piloté par le défilement, réponses au survol réservées aux pointeurs fins et coupées en mouvement réduit.
@@ -49,7 +49,7 @@ La commande enchaîne le typecheck, les garde-fous, les tests et le build.
 
 ## Limites connues
 
-- PGlite couvre le développement et les tests ; la production utilise PostgreSQL sur Neon. Les routes serverless Vercel ne sont pas encore déployées.
+- PGlite couvre le développement et les tests ; la production utilise PostgreSQL sur Neon et les routes serverless sont déployées sur Vercel.
 - L’envoi des cartes exige `MAIL_API_KEY`, `MEMBER_FROM_EMAIL` et `MEMBER_DOSSIER_EMAILS` côté serveur. Sans clé, le service répond « pas encore ouvert » au lieu de confirmer un envoi.
 - Pas encore de liste des membres dans le Studio ni de renvoi de carte depuis l’interface : le bureau retrouve chaque dossier dans sa boîte e-mail.
 - Le fichier JSON de secours doit être remplacé puis redéployé pour publier sans API.
@@ -62,4 +62,4 @@ La commande enchaîne le typecheck, les garde-fous, les tests et le build.
 
 ## Prochaine étape technique
 
-Déployer sur Vercel, brancher le stockage d’objets et les sauvegardes, remplacer le mot de passe propriétaire, puis relire les textes avec le bureau.
+Vérifier l’écriture de l’instantané sur Vercel Blob, ajouter le jeton privé aux secrets GitHub, lancer un premier test de sauvegarde, remplacer le mot de passe propriétaire, puis relire les textes avec le bureau.

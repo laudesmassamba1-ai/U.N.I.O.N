@@ -79,13 +79,13 @@ Deux emplacements logiques, jamais versionnés dans le dépôt :
 - `public/` : instantané `edition.json`, images servies par CDN ;
 - `backups/` : dumps chiffrés, accès privé.
 
-Fournisseur retenu : **Cloudflare R2**. Deux seaux : `union-public` (instantané `edition.json`, images ; accès public par domaine personnalisé, `r2.dev` réservé aux essais) et `union-backups` (privé, dumps chiffrés). `pnpm storage:setup --confirm` crée les deux seaux dès que le jeton S3 est dans `.env.local`.
+Fournisseur retenu : **Vercel Blob**, inclus dans le plan Hobby gratuit et déjà relié au projet. Deux Blob : `union-public` (instantané `edition.json`, images ; accès public) et `union-backups` (privé, dumps chiffrés). Les deux ont été créés en région `lhr1` via le CLI Vercel.
 
-Le contrat `SnapshotSource` permet de changer de fournisseur sans toucher à l’API. `RemoteSnapshotSource` lit `SNAPSHOT_URL` et écrit directement dans R2 via `lib/server/objectStore.ts` (`OBJECT_STORE_*`) ; `SNAPSHOT_WRITE_URL` ne sert que de repli. Voir `DECISIONS.md`.
+Le contrat `SnapshotSource` permet de changer de fournisseur sans toucher à l’API. `RemoteSnapshotSource` lit `SNAPSHOT_URL` et écrit directement dans le Blob public via `lib/server/objectStore.ts` (`BLOB_READ_WRITE_TOKEN` ou `BLOB_PUBLIC_READ_WRITE_TOKEN`) ; `SNAPSHOT_WRITE_URL` ne sert que de repli. Voir `DECISIONS.md`.
 
 ## 8. Sauvegarde
 
-- `.github/workflows/backup.yml` : quotidien, `pg_dump` par le rôle lecture seule, chiffrement `age`, envoi S3, ligne dans `backup_log`.
+- `.github/workflows/backup.yml` : quotidien, `pg_dump` par le rôle lecture seule, chiffrement `age`, envoi vers le Blob privé Vercel, ligne dans `backup_log`.
 - `.github/workflows/restore-test.yml` : mensuel, déchiffre avec une clé de test, restaure dans un PostgreSQL éphémère, compare les nombres de lignes au fichier `counts.json` de la sauvegarde.
 - `RESTAURATION.md` décrit la restauration réelle, en moins d’une heure.
 - La clé privée `age` n’est ni sur le serveur ni dans GitHub.
@@ -101,8 +101,8 @@ Le contrat `SnapshotSource` permet de changer de fournisseur sans toucher à l�
 3. ~~`pnpm db:roles` puis `pnpm db:seed`.~~ Fait.
 4. ~~`pnpm prove:neon`.~~ Fait.
 5. Déployer Vercel : `api/[...path].ts` sert toutes les routes `/api/*` ; `/api/cron/daily` est protégé par `CRON_SECRET` et planifié dans `vercel.json`.
-6. Créer les seaux R2 (`union-public`, `union-backups`) et renseigner les variables Vercel.
-7. Le secret GitHub `DATABASE_URL_BACKUP_RO` et `AGE_PUBLIC_KEY` sont posés ; il reste les secrets S3 et le premier essai du workflow.
+6. ~~Créer les Blob `union-public` et `union-backups`.~~ Fait via le CLI Vercel ; renseigner `SNAPSHOT_URL`.
+7. Le secret GitHub `DATABASE_URL_BACKUP_RO` et `AGE_PUBLIC_KEY` sont posés ; il reste `BLOB_PRIVATE_READ_WRITE_TOKEN` et le premier essai du workflow.
 8. ~~Remplacer le mot de passe `neondb_owner` exposé dans `.env.local`.~~ Fait ; le reporter dans Vercel à la création du projet.
 
 ## 10. Exploitation

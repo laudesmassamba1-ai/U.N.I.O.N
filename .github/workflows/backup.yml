@@ -18,19 +18,29 @@ jobs:
     timeout-minutes: 20
     env:
       DATABASE_URL_BACKUP_RO: ${{ secrets.DATABASE_URL_BACKUP_RO }}
-      BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
-      BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
-      BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
-      BACKUP_S3_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+      BLOB_PRIVATE_READ_WRITE_TOKEN: ${{ secrets.BLOB_PRIVATE_READ_WRITE_TOKEN }}
       AGE_PUBLIC_KEY: ${{ secrets.AGE_PUBLIC_KEY }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
-      AWS_DEFAULT_REGION: auto
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enable Corepack and install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@latest --activate
+          pnpm --version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Vérifier les secrets
         run: |
-          for name in DATABASE_URL_BACKUP_RO BACKUP_S3_ENDPOINT BACKUP_S3_BUCKET \
-            BACKUP_S3_ACCESS_KEY_ID BACKUP_S3_SECRET_ACCESS_KEY AGE_PUBLIC_KEY; do
+          for name in DATABASE_URL_BACKUP_RO BLOB_PRIVATE_READ_WRITE_TOKEN AGE_PUBLIC_KEY; do
             if [ -z "${!name}" ]; then
               echo "::error::$name manquant. Voir ENV.md."
               exit 1
@@ -41,7 +51,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-client age
-          aws --version
           psql --version
           age --version
 
@@ -75,15 +84,11 @@ jobs:
           sha256sum union.dump.age | cut -d' ' -f1 > sha256.txt
           stat -c%s union.dump.age > size.txt
 
-      - name: Envoyer au stockage privé
+      - name: Envoyer au Blob privé
         run: |
           stamp="${{ steps.name.outputs.stamp }}"
-          aws s3 cp union.dump.age \
-            "s3://$BACKUP_S3_BUCKET/backups/union-$stamp.dump.age" \
-            --endpoint-url "$BACKUP_S3_ENDPOINT"
-          aws s3 cp counts.json \
-            "s3://$BACKUP_S3_BUCKET/backups/union-$stamp.counts.json" \
-            --endpoint-url "$BACKUP_S3_ENDPOINT"
+          node scripts/blob-store.mjs put union.dump.age "backups/union-$stamp.dump.age"
+          node scripts/blob-store.mjs put counts.json "backups/union-$stamp.counts.json"
 
       - name: Journaliser dans backup_log
         run: |
@@ -104,17 +109,15 @@ jobs:
 
       - name: Rétention (8 quotidiennes, 3 mensuelles)
         run: |
-          aws s3 ls "s3://$BACKUP_S3_BUCKET/backups/" \
-            --endpoint-url "$BACKUP_S3_ENDPOINT" \
-            | awk '{ print $4 }' | grep '^union-.*\.dump\.age$' | sort > all.txt
-          monthly=$(grep -c 'union-....-..-01T' all.txt || true)
+          node scripts/blob-store.mjs list backups/ | grep '^backups/union-.*\.dump\.age$' | sort > all.txt
+          monthly=$(grep -c '^backups/union-....-..-01T' all.txt || true)
           if [ "$monthly" -gt 3 ]; then
-            grep 'union-....-..-01T' all.txt | head -n -3 | while read -r key; do
-              aws s3 rm "s3://$BACKUP_S3_BUCKET/backups/$key" --endpoint-url "$BACKUP_S3_ENDPOINT"
+            grep '^backups/union-....-..-01T' all.txt | head -n -3 | while read -r path; do
+              node scripts/blob-store.mjs delete "$path"
             done
           fi
-          grep -v 'union-....-..-01T' all.txt | head -n -8 | while read -r key; do
-            aws s3 rm "s3://$BACKUP_S3_BUCKET/backups/$key" --endpoint-url "$BACKUP_S3_ENDPOINT"
+          grep -v '^backups/union-....-..-01T' all.txt | head -n -8 | while read -r path; do
+            node scripts/blob-store.mjs delete "$path"
           done
 
       - name: Résumé

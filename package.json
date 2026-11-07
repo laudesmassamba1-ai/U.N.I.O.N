@@ -13,7 +13,6 @@
     "db:migrate": "node --env-file-if-exists=.env.local node_modules/drizzle-kit/bin.cjs migrate",
     "db:check": "node --env-file-if-exists=.env.local node_modules/drizzle-kit/bin.cjs check",
     "db:seed": "node --env-file-if-exists=.env.local scripts/seed-settings.mjs",
-    "storage:setup": "node --env-file=.env.local scripts/storage-setup.mjs",
     "db:roles": "node --env-file-if-exists=.env.local scripts/db-roles.mjs",
     "prove:neon": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/prove-neon.ts --confirm",
     "lint:copy": "node scripts/check-copy.mjs",
@@ -30,7 +29,7 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
-    "aws4fetch": "^1.0.20",
+    "@vercel/blob": "^2.8.2",
     "drizzle-orm": "^0.45.4",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
