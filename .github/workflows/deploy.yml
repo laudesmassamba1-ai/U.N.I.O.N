@@ -39,6 +39,9 @@ jobs:
         run: pnpm build
         env:
           VITE_BASE: '/U.N.I.O.N/'
+          # Boîtes du bureau pour le lien de messagerie. À définir dans
+          # Settings → Secrets and variables → Actions → Variables.
+          VITE_DOSSIER_EMAILS: ${{ vars.VITE_DOSSIER_EMAILS }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
