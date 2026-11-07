@@ -87,6 +87,10 @@ export function validateMemberInput(data: unknown): {
   fullName: string;
   email: string;
   department: string | null;
+  phone: string | null;
+  documentsConsent: boolean;
+  selfiePath: string | null;
+  identityPath: string | null;
 } {
   const errors: ValidationError[] = [];
   if (!data || typeof data !== 'object') {
@@ -110,15 +114,35 @@ export function validateMemberInput(data: unknown): {
   const rawDepartment = typeof obj.department === 'string' ? obj.department.trim() : '';
   const department = rawDepartment ? rawDepartment.slice(0, 60) : null;
 
+  const rawPhone = typeof obj.phone === 'string' ? obj.phone.trim() : '';
+  const phone = rawPhone || null;
+  if (phone && !/^[+0-9][0-9 \-()]{5,120}$/.test(phone)) {
+    errors.push({ field: 'phone', message: 'Indiquez un numéro de téléphone valide' });
+  }
+
+  const documentsConsent = obj.documentsConsent === true;
+
   if (obj.consent !== true) {
     errors.push({ field: 'consent', message: 'L’accord pour l’envoi de la carte est obligatoire' });
+  }
+
+  if (!documentsConsent) {
+    errors.push({ field: 'documentsConsent', message: 'Cochez la case pour autoriser la transmission des documents au bureau et au Studio' });
   }
 
   if (errors.length > 0) {
     throw new ValidationException(errors);
   }
 
-  return { fullName: cleanName, email, department };
+  return {
+    fullName: cleanName,
+    email,
+    department,
+    phone,
+    documentsConsent,
+    selfiePath: typeof obj.selfiePath === 'string' ? obj.selfiePath.trim() || null : null,
+    identityPath: typeof obj.identityPath === 'string' ? obj.identityPath.trim() || null : null,
+  };
 }
 
 export function validateReportInput(data: unknown): {

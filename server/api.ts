@@ -22,6 +22,7 @@ import {
   ValidationException,
 } from './validator.js';
 import { buildMemberCard, buildMemberDossier, createMemberNumber } from './member-card.js';
+import { storeMemberDocuments } from './member-documents.js';
 import { dossierRecipients, isMailConfigured, sendMail } from './mail.js';
 import { buildHealthReport, DB_STORAGE_LIMIT_BYTES } from './health.js';
 import {
@@ -99,6 +100,203 @@ export async function readJsonBody(req: IncomingMessage): Promise<unknown> {
       }
     });
   });
+}
+
+function isFormDataContentType(contentType: string | undefined): boolean {
+  return Boolean(contentType && contentType.toLowerCase().startsWith('multipart/form-data'));
+}
+
+interface RawFormFile {
+  name: string;
+  type: string;
+  body: Buffer;
+}
+
+interface RawFormFields {
+  fields: Record<string, string | null>;
+  files: Record<string, RawFormFile | null>;
+}
+
+async function readFormDataBody(req: IncomingMessage, maxFileBytes = 5 * 1024 * 1024): Promise<RawFormFields> {
+  const contentType = req.headers['content-type']?.toString() || '';
+  const boundary = contentType.split('boundary=')[1]?.trim();
+  if (!boundary) {
+    throw new Error('Frontière de formulaire manquante.');
+  }
+
+  const encoder = new TextEncoder();
+  const boundaryBytes = Buffer.from(encoder.encode('--' + boundary));
+  const crlf = Buffer.from(encoder.encode('\r\n'));
+  const lf = Buffer.from(encoder.encode('\n'));
+
+  const chunks: Buffer[] = [];
+  let total = 0;
+
+  return new Promise((resolve, reject) => {
+    req.on('data', (chunk: Buffer) => {
+      if (total > maxFileBytes * 3) {
+        req.destroy();
+        return;
+      }
+      total += chunk.length;
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      try {
+        const buffer = Buffer.concat(chunks, total);
+        resolve(parseMultipart(buffer, boundaryBytes, crlf, lf, maxFileBytes));
+      } catch (error) {
+        reject(error);
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+function parseMultipart(
+  buffer: Buffer,
+  boundaryBytes: Buffer,
+  crlf: Buffer,
+  lf: Buffer,
+  maxFileBytes: number,
+): RawFormFields {
+  const fields: Record<string, string | null> = {};
+  const files: Record<string, RawFormFile | null> = {};
+
+  let pos = 0;
+  const len = buffer.length;
+
+  while (pos < len) {
+    if (!scanDelimiter(buffer, pos, boundaryBytes, crlf)) {
+      throw new Error('Form-data illisible.');
+    }
+    pos = skipBytes(buffer, pos, boundaryBytes.length);
+
+    if (buffer[pos] === 0x2d && buffer[pos + 1] === 0x2d) {
+      pos += 2;
+      break;
+    }
+    if (pos < len && buffer[pos] === 0x0d) {
+      pos += 1;
+    }
+    if (pos < len && buffer[pos] === 0x0a) {
+      pos += 1;
+    }
+
+    let dispositionEnd = indexOfLineEnd(buffer, pos);
+    if (dispositionEnd < 0) {
+      throw new Error('En-tête de partie manquant.');
+    }
+    const headerPart = buffer.slice(pos, dispositionEnd).toString('latin1');
+    pos = dispositionEnd + 1;
+
+    const name = extractHeaderValue(headerPart, 'name');
+    const filename = extractHeaderValue(headerPart, 'filename');
+
+    let contentType = 'application/octet-stream';
+    let headersEnd = pos;
+    while (headersEnd < len) {
+      const lineEnd = indexOfLineEnd(buffer, headersEnd);
+      if (lineEnd < 0) {
+        throw new Error('En-tête de partie illisible.');
+      }
+      const raw = buffer.slice(headersEnd, lineEnd).toString('latin1');
+      headersEnd = lineEnd + 1;
+      if (raw.trim() === '') {
+        break;
+      }
+      if (/^\s*[Cc]ontent-[Tt]ype:\s*/i.test(raw)) {
+        contentType = raw.replace(/^\s*[Cc]ontent-[Tt]ype:\s*/i, '').trim();
+      }
+    }
+
+    if (filename) {
+      const fileEnd = indexOfDelimiter(buffer, pos, boundaryBytes);
+      if (fileEnd < 0) {
+        throw new Error('Partie de fichier illisible.');
+      }
+      const raw = buffer.slice(pos, fileEnd);
+      const fileBytes = raw.length >= 2 && raw[raw.length - 2] === 0x0d && raw[raw.length - 1] === 0x0a
+        ? raw.slice(0, raw.length - 2)
+        : raw;
+
+      if (fileBytes.length > maxFileBytes) {
+        throw new Error('Fichier trop volumineux.');
+      }
+
+      files[name] = {
+        name: filename,
+        type: contentType,
+        body: fileBytes,
+      };
+      pos = fileEnd;
+    } else {
+      const valueEnd = indexOfDelimiter(buffer, pos, boundaryBytes);
+      if (valueEnd < 0) {
+        throw new Error('Champ texte illisible.');
+      }
+      const raw = buffer.slice(pos, valueEnd).toString('utf8').trim();
+      fields[name] = raw || null;
+      pos = valueEnd;
+    }
+  }
+
+  return { fields, files };
+}
+
+function scanDelimiter(buffer: Buffer, pos: number, delimiter: Buffer, crlf: Buffer): boolean {
+  const dlen = delimiter.length;
+  if (pos + dlen + crlf.length <= buffer.length) {
+    const chunk = buffer.subarray(pos, pos + dlen);
+    if (Buffer.compare(chunk, delimiter) === 0) {
+      if (buffer[pos + dlen] === 0x0d && buffer[pos + dlen + 1] === 0x0a) {
+        return true;
+      }
+    }
+  }
+  if (pos + dlen <= buffer.length) {
+    const chunk = buffer.subarray(pos, pos + dlen);
+    if (Buffer.compare(chunk, delimiter) === 0) {
+      return buffer[pos + dlen] === 0x0a;
+    }
+  }
+  return false;
+}
+
+function indexOfDelimiter(buffer: Buffer, start: number, delimiter: Buffer): number {
+  const dlen = delimiter.length;
+  for (let i = start; i <= buffer.length - dlen; i++) {
+    const chunk = buffer.subarray(i, i + dlen);
+    if (Buffer.compare(chunk, delimiter) === 0) {
+      const after = i + dlen;
+      if (after < buffer.length && buffer[after] === 0x0d && buffer[after + 1] === 0x0a) {
+        return i;
+      }
+      if (after === buffer.length || buffer[after] === 0x0a) {
+        return i;
+      }
+    }
+  }
+  return -1;
+}
+
+function indexOfLineEnd(buffer: Buffer, start: number): number {
+  for (let i = start; i < buffer.length; i++) {
+    if (buffer[i] === 0x0a) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function skipBytes(buffer: Buffer, pos: number, count: number): number {
+  return pos + count;
+}
+
+function extractHeaderValue(header: string, key: string): string {
+  const match = header.match(new RegExp(`${key}="([^"]*)"|,${key}=([^;\\r\n]*)`, 'i'));
+  if (!match) return '';
+  return (match[1] ?? match[2] ?? '').trim();
 }
 
 function sendJson(res: ServerResponse, statusCode: number, data: unknown, extraHeaders: Record<string, string> = {}): void {
@@ -503,25 +701,57 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         return true;
       }
 
-      const body = await readJsonBody(req);
-      const input = validateMemberInput(body);
+      const contentType = (req.headers['content-type'] ?? '').toString();
+      let fields: Record<string, string | null>;
+      let files: Record<string, RawFormFile | null>;
+
+      if (isFormDataContentType(contentType)) {
+        const parsed = await readFormDataBody(req);
+        fields = parsed.fields;
+        files = parsed.files;
+      } else {
+        const raw = await readJsonBody(req) as Record<string, unknown> | null;
+        fields = raw
+          ? Object.fromEntries(Object.entries(raw).map(([key, value]) => [key, typeof value === 'string' ? value : null]))
+          : {};
+        files = {};
+      }
+
+      const input = validateMemberInput({
+        ...fields,
+        selfiePath: files.selfie ? `/selfies/${files.selfie.name}` : null,
+        identityPath: files.identity ? `/documents/${files.identity.name}` : null,
+      });
+
       const now = new Date();
       const issuedAt = now.toISOString();
       const memberNumber = createMemberNumber(now);
 
-      // 1. Le dossier part au bureau. Sans ce courriel, rien n’est enregistré.
-      const dossier = buildMemberDossier({
+      const documents = await storeMemberDocuments(
+        process.env,
+        {
+          selfie: (files.selfie && files.selfie.body.length > 0) ? new File([Buffer.from(files.selfie.body)], files.selfie.name, { type: files.selfie.type }) : null,
+          identity: (files.identity && files.identity.body.length > 0) ? new File([Buffer.from(files.identity.body)], files.identity.name, { type: files.identity.type }) : null,
+        },
+        now,
+      );
+
+      // 1. Le dossier part au bureau.
+      const bureauDossier = buildMemberDossier({
         fullName: input.fullName,
         email: input.email,
         department: input.department,
+        phone: input.phone,
         memberNumber,
         issuedAt,
+        documentSelfieUrl: documents.selfie?.url ?? null,
+        documentIdUrl: documents.identity?.url ?? null,
       });
       const bureauSend = await sendMail({
         to: dossierRecipients(),
-        subject: dossier.subject,
-        html: dossier.html,
-        text: dossier.text,
+        subject: bureauDossier.subject,
+        html: bureauDossier.html,
+        text: bureauDossier.text,
         replyTo: input.email,
       });
       if (!bureauSend.ok) {
@@ -531,16 +761,42 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         return true;
       }
 
+      // 1b. Notification Studio pour vérification.
+      const studioDossier = buildMemberDossier({
+        fullName: input.fullName,
+        email: input.email,
+        department: input.department,
+        phone: input.phone,
+        memberNumber,
+        issuedAt,
+        documentSelfieUrl: documents.selfie?.url ?? null,
+        documentIdUrl: documents.identity?.url ?? null,
+      }, { studio: true });
+
+      const studioSend = await sendMail({
+        to: dossierRecipients(),
+        subject: studioDossier.subject,
+        html: studioDossier.html,
+        text: studioDossier.text,
+        replyTo: input.email,
+      });
+
+      if (!studioSend.ok) {
+        console.warn('Notification Studio non envoyée :', studioSend.reason);
+      }
+
       const db = await getDatabase();
       await db.transaction(async (tx) => {
         await tx.prepare(
-          'INSERT INTO members (id, member_number, full_name, email, department, status, created_at, card_sent_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO members (id, member_number, full_name, email, department, phone, documents_consent, status, created_at, card_sent_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         ).run(
           `member-${crypto.randomUUID()}`,
           memberNumber,
           input.fullName,
           input.email,
           input.department,
+          input.phone,
+          input.documentsConsent ? 1 : 0,
           'dossier_recu',
           issuedAt,
           null,
@@ -557,7 +813,10 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         fullName: input.fullName,
         memberNumber,
         department: input.department,
+        phone: input.phone,
         issuedAt,
+        documentSelfieUrl: documents.selfie?.url ?? null,
+        documentIdUrl: documents.identity?.url ?? null,
       });
       const cardSend = await sendMail({
         to: [input.email],
@@ -572,7 +831,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
           cardSent: false,
           memberNumber,
           message:
-            'Votre dossier est arrivé au bureau, mais la carte n’a pas pu être envoyée à votre adresse.',
+            'Votre dossier est arrivé au bureau et au Studio, mais la carte n’a pas pu être envoyée à votre adresse.',
         });
         return true;
       }
@@ -587,7 +846,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         ok: true,
         cardSent: true,
         memberNumber,
-        message: 'Votre dossier est arrivé au bureau et votre carte a été envoyée.',
+        message: 'Votre dossier est arrivé au bureau et au Studio, et votre carte a été envoyée.',
       });
       return true;
     }

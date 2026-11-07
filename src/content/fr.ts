@@ -485,16 +485,16 @@ export const memberCardPage = {
   eyebrow: 'Carte de membre',
   title: 'Recevoir sa carte de membre',
   intro:
-    'Indiquez votre nom et votre adresse e-mail. Votre dossier part au bureau et votre carte vous est envoyée à cette adresse.',
+    'Indiquez votre nom, votre adresse e-mail et, si vous le souhaitez, votre numéro de téléphone, un selfie et une pièce d’identité. Votre dossier part au bureau, au Studio et à vous-même.',
   stepsTitle: 'Comment ça marche',
   steps: [
     {
       title: 'Vous remplissez',
-      text: 'Nom, adresse e-mail, département facultatif, accord explicite.',
+      text: 'Nom, adresse e-mail, numéro facultatif, selfie et pièce d’identité facultatifs, accord explicite.',
     },
     {
-      title: 'Le bureau reçoit',
-      text: 'Le dossier part sur les deux boîtes du bureau, avec votre demande complète.',
+      title: 'Le dossier part',
+      text: 'Le bureau et le Studio reçoivent votre demande avec les documents joints, pour vérifier et délivrer la carte.',
     },
     {
       title: 'Vous recevez la carte',
@@ -520,6 +520,17 @@ export const memberCardPage = {
   emailPlaceholder: 'L’adresse à laquelle recevoir la carte',
   departmentLabel: 'Département (facultatif)',
   departmentNone: 'Ne pas préciser',
+  phoneLabel: 'Numéro de téléphone (facultatif)',
+  phonePlaceholder: 'Ex. +242 06 123 45 67',
+  selfieLabel: 'Selfie (facultatif)',
+  selfiePlaceholder: 'Prenez votre photo avec l’icône caméra',
+  selfieCapture: 'Prendre une photo',
+  selfieRemove: 'Retirer la photo',
+  identityLabel: 'Pièce d’identité (facultatif)',
+  identityPlaceholder: 'Photo ou scan de votre pièce d’identité',
+  identityRemove: 'Retirer le document',
+  documentsConsentLabel:
+    'J’accepte que mon nom, mon adresse e-mail, mon numéro de téléphone, mon selfie et mon document d’identité soient transmis au bureau et au Studio pour vérifier et délivrer ma carte de membre.',
   consentLabel:
     'J’accepte que mon nom, mon adresse e-mail et mon département soient transmis au bureau pour établir ma carte de membre.',
   submit: 'Demander ma carte',
@@ -534,12 +545,17 @@ export const memberCardPage = {
   again: 'Demander une autre carte',
   privacyTitle: 'Vos données',
   privacyNote:
-    'Le site ne publie aucune donnée de membre. Le nom et l’adresse ne servent qu’à transmettre le dossier et à envoyer la carte.',
+    'Le site ne publie aucune donnée de membre. Le nom, l’adresse e-mail, le numéro de téléphone, le selfie et le document d’identité servent uniquement à vérifier votre demande et à envoyer la carte.',
   errors: {
     name: 'Indiquez votre nom complet.',
     email: 'Indiquez une adresse e-mail valide.',
+    phone: 'Indiquez un numéro de téléphone valide.',
     consent: 'Cochez la case pour accepter l’envoi de la carte.',
+    documentsConsent: 'Cochez la case pour autoriser la transmission des documents au bureau et au Studio.',
     network: 'L’envoi n’a pas abouti. Vérifiez votre connexion et réessayez.',
+    selfie: 'La photo n’a pas pu être lue.',
+    identity: 'Le document n’a pas pu être lu.',
+    cameraUnavailable: 'La caméra n’est pas accessible sur cet appareil.',
   },
 } as const;
 

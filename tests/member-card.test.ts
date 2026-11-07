@@ -8,6 +8,7 @@ const validInput = {
   email: 'awa@example.com',
   department: 'Pool',
   consent: true,
+  documentsConsent: true,
 };
 
 describe('carte de membre', () => {
@@ -52,6 +53,10 @@ describe('carte de membre', () => {
         fullName: 'Awa Mbemba',
         email: 'awa@example.com',
         department: 'Pool',
+        documentsConsent: true,
+        identityPath: null,
+        phone: null,
+        selfiePath: null,
       });
     });
 

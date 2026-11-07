@@ -4,6 +4,9 @@ export interface MemberCardInput {
   fullName: string;
   memberNumber: string;
   department: string | null;
+  phone: string | null;
+  documentSelfieUrl: string | null;
+  documentIdUrl: string | null;
   issuedAt: string;
 }
 
@@ -120,33 +123,61 @@ export function buildMemberCard(input: MemberCardInput): {
   return { subject: 'Votre carte de membre de l’U.N.I.O.N', html, text };
 }
 
-/** Dossier envoyé au bureau : les mêmes informations, sans mise en page de carte. */
+/** Dossier envoyé au bureau et au Studio : informations + documents joints. */
 export function buildMemberDossier(
   input: MemberCardInput & { email: string },
+  { studio = false }: { studio?: boolean } = {},
 ): { subject: string; html: string; text: string } {
   const name = escapeHtml(input.fullName);
   const email = escapeHtml(input.email);
   const department = input.department ? escapeHtml(input.department) : 'Non précisé';
+  const phone = input.phone ? escapeHtml(input.phone) : 'Non précisé';
   const number = escapeHtml(input.memberNumber);
   const issued = formatIssuedAt(input.issuedAt);
+  const selfieUrl = input.documentSelfieUrl && input.documentSelfieUrl.trim() ? input.documentSelfieUrl.trim() : null;
+  const identityUrl = input.documentIdUrl && input.documentIdUrl.trim() ? input.documentIdUrl.trim() : null;
 
   const rows: Array<[string, string]> = [
     ['Nom', name],
     ['Adresse e-mail', email],
+    ['Numéro de téléphone', phone],
     ['Département', department],
     ['Numéro de carte', number],
     ['Date de la demande', escapeHtml(issued)],
   ];
 
+  const attachments: Array<{ label: string; url: string }> = [];
+  if (selfieUrl) attachments.push({ label: 'Selfie', url: selfieUrl });
+  if (identityUrl) attachments.push({ label: 'Pièce d’identité', url: identityUrl });
+
+  const attachmentsSection = attachments.length > 0
+    ? `<tr>
+      <td style="padding:0 22px 22px 22px;">
+        <hr style="border:0;border-top:1px solid #d8d4cb;margin:0 0 12px 0;" />
+        <p style="margin:0 0 8px 0;font-size:11px;color:#4a453f;">Documents joints :</p>
+        ${attachments
+          .map(
+            (attachment) =>
+              `<p style="margin:0 0 4px 0;font-size:12px;color:#14110f;">• ${escapeHtml(attachment.label)} : <a href="${escapeHtml(attachment.url)}">${attachment.label}</a></p>`,
+          )
+          .join('\n')}
+      </td>
+    </tr>`
+    : '';
+
+  const introLine = studio
+    ? 'Un nouveau dossier de carte de membre a été transmis au Studio pour vérification avant délivrance.'
+    : 'La personne a accepté l’envoi de sa carte. Pour lui répondre, utilisez la fonction « Répondre » : cette réponse part à l’adresse indiquée ci-dessus.';
+
   const html = `<!doctype html>
 <html lang="fr">
-<head><meta charset="utf-8" /><title>Nouveau dossier de membre</title></head>
+<head><meta charset="utf-8" /><title>${escapeHtml(studio ? 'Dossier Studio : ' + input.fullName : 'Nouveau dossier de membre')}</title></head>
 <body style="margin:0;padding:24px;background:#f2f1ec;font-family:Helvetica,Arial,sans-serif;color:#14110f;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;border-collapse:collapse;background:#ffffff;border:2px solid #14110f;">
     <tr>
       <td style="padding:22px 22px 16px 22px;">
         <p style="margin:0;font-size:12px;letter-spacing:3px;font-weight:bold;">U.N.I.O.N</p>
-        <p style="margin:6px 0 0 0;font-size:13px;">Nouveau dossier de membre</p>
+        <p style="margin:6px 0 0 0;font-size:13px;">${escapeHtml(studio ? 'Nouveau dossier Studio' : 'Nouveau dossier de membre')}</p>
       </td>
     </tr>
     <tr>
@@ -161,12 +192,10 @@ export function buildMemberDossier(
         </table>
       </td>
     </tr>
+    ${attachmentsSection}
     <tr>
       <td style="padding:0 22px 22px 22px;">
-        <p style="margin:0;font-size:11px;line-height:1.5;color:#4a453f;">
-          La personne a accepté l’envoi de sa carte. Pour lui répondre, utilisez la fonction « Répondre » :
-          cette réponse part à l’adresse indiquée ci-dessus.
-        </p>
+        <p style="margin:0;font-size:11px;line-height:1.5;color:#4a453f;">${escapeHtml(introLine)}</p>
       </td>
     </tr>
   </table>
@@ -174,12 +203,14 @@ export function buildMemberDossier(
 </html>`;
 
   const text = [
-    'U.N.I.O.N — Nouveau dossier de membre',
+    'U.N.I.O.N — ' + (studio ? 'Nouveau dossier Studio' : 'Nouveau dossier de membre'),
     '',
     ...rows.map(([label, value]) => `${label} : ${value.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")}`),
     '',
-    'La personne a accepté l’envoi de sa carte.',
-  ].join('\n');
+    attachments.length > 0 ? 'Documents joints : ' + attachments.map((a) => a.label + ' : ' + a.url).join(', ') : '',
+    '',
+    introLine,
+  ].filter(Boolean).join('\n');
 
-  return { subject: `Nouveau dossier de membre : ${input.fullName}`, html, text };
+  return { subject: `${studio ? '[Studio] ' : ''}${input.fullName} — ${studio ? 'Dossier à vérifier' : 'Nouveau dossier de membre'}`, html, text };
 }

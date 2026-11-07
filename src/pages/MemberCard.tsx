@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import type { FormEvent } from 'react';
+import { useMemo, useEffect, useRef, useState } from 'react';
+import type { FormEvent, RefObject } from 'react';
 import { Link } from '../components/Link';
 import { PageHeader } from '../components/Layout';
 import { Container, Section, SectionHead, StatusStamp } from '../components/ui';
@@ -19,22 +19,145 @@ export default function MemberCard() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [department, setDepartment] = useState('');
+  const [phone, setPhone] = useState('');
   const [consent, setConsent] = useState(false);
+  const [documentsConsent, setDocumentsConsent] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
   const [result, setResult] = useState<CardResult | null>(null);
 
+  const [selfie, setSelfie] = useState<File | null>(null);
+  const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
+  const [selfieValueError, setSelfieValueError] = useState<string | null>(null);
+  const selfieRef = useRef<HTMLInputElement | null>(null);
+
+  const [identity, setIdentity] = useState<File | null>(null);
+  const [identityPreview, setIdentityPreview] = useState<string | null>(null);
+  const [identityValueError, setIdentityValueError] = useState<string | null>(null);
+  const identityInputRef = useRef<HTMLInputElement | null>(null);
+
+  const cameraRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
   const recipients = useMemo(() => dossierRecipients(), []);
   const mailto = useMemo(
-    () => buildDossierMailto(recipients, { fullName: fullName.trim(), department: department || null }),
-    [recipients, fullName, department],
+    () => buildDossierMailto(recipients, { fullName: fullName.trim(), department: department || null, phone: phone.trim() || null }),
+    [recipients, fullName, department, phone],
   );
+
+  const startCamera = async () => {
+    if (!cameraRef.current) return;
+    if (streamRef.current) {
+      stopCamera();
+      return;
+    }
+    try {
+      setSelfieValueError(null);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 800 }, height: { ideal: 800 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      cameraRef.current.srcObject = stream;
+      await cameraRef.current.play();
+    } catch (caught) {
+      setSelfieValueError(memberCardPage.errors.cameraUnavailable);
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (cameraRef.current) {
+      cameraRef.current.srcObject = null;
+    }
+  };
+
+  const captureSelfie = async () => {
+    if (!cameraRef.current || !cameraRef.current.readyState) {
+      setSelfieValueError(memberCardPage.errors.cameraUnavailable);
+      return;
+    }
+    const width = cameraRef.current.videoWidth || 800;
+    const height = cameraRef.current.videoHeight || 800;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    if (!context) {
+      setSelfieValueError(memberCardPage.errors.cameraUnavailable);
+      return;
+    }
+    context.drawImage(cameraRef.current, 0, 0, width, height);
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((image) => resolve(image), 'image/jpeg', 0.85);
+    });
+    if (!blob || blob.size === 0) {
+      setSelfieValueError(memberCardPage.errors.selfie);
+      return;
+    }
+    stopCamera();
+    const file = new File([blob], 'selfie.jpg', { type: 'image/jpeg' });
+    setSelfie(file);
+    setSelfiePreview(URL.createObjectURL(file));
+    setSelfieValueError(null);
+  };
+
+  const removeSelfie = () => {
+    stopCamera();
+    if (selfiePreview) {
+      URL.revokeObjectURL(selfiePreview);
+      setSelfiePreview(null);
+    }
+    setSelfie(null);
+    setSelfieValueError(null);
+    if (selfieRef.current) selfieRef.current.value = '';
+  };
+
+  const handleIdentityChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) {
+      setIdentity(null);
+      if (identityPreview) {
+        URL.revokeObjectURL(identityPreview);
+        setIdentityPreview(null);
+      }
+      setIdentityValueError(null);
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      setIdentityValueError(memberCardPage.errors.identity);
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setIdentityValueError(memberCardPage.errors.identity);
+      return;
+    }
+    if (identityPreview) URL.revokeObjectURL(identityPreview);
+    setIdentity(file);
+    setIdentityPreview(URL.createObjectURL(file));
+    setIdentityValueError(null);
+  };
+
+  const removeIdentity = () => {
+    if (identityPreview) {
+      URL.revokeObjectURL(identityPreview);
+      setIdentityPreview(null);
+    }
+    setIdentity(null);
+    setIdentityValueError(null);
+    if (identityInputRef.current) identityInputRef.current.value = '';
+  };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
     setUnavailable(false);
+    setSelfieValueError(null);
+    setIdentityValueError(null);
 
     if (fullName.trim().length < 2) {
       setError(memberCardPage.errors.name);
@@ -44,8 +167,16 @@ export default function MemberCard() {
       setError(memberCardPage.errors.email);
       return;
     }
+    if (phone.trim() && !/^[+0-9][0-9 \-()]{5,120}$/.test(phone.trim())) {
+      setError(memberCardPage.errors.phone);
+      return;
+    }
     if (!consent) {
       setError(memberCardPage.errors.consent);
+      return;
+    }
+    if (!documentsConsent) {
+      setError(memberCardPage.errors.documentsConsent);
       return;
     }
 
@@ -55,13 +186,21 @@ export default function MemberCard() {
         fullName: fullName.trim(),
         email: email.trim(),
         department: department || null,
+        phone: phone.trim() || null,
         consent: true,
+        documentsConsent: true,
+        selfie,
+        identity,
       });
       setResult(response);
       setFullName('');
       setEmail('');
       setDepartment('');
+      setPhone('');
       setConsent(false);
+      setDocumentsConsent(false);
+      removeSelfie();
+      removeIdentity();
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : '';
       setError(message || memberCardPage.errors.network);
@@ -70,6 +209,14 @@ export default function MemberCard() {
       setSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+      if (selfiePreview) URL.revokeObjectURL(selfiePreview);
+      if (identityPreview) URL.revokeObjectURL(identityPreview);
+    };
+  }, []);
 
   return (
     <>
@@ -163,6 +310,24 @@ export default function MemberCard() {
                     </div>
 
                     <div className="field">
+                      <label htmlFor="carte-telephone">{memberCardPage.phoneLabel}</label>
+                      <input
+                        id="carte-telephone"
+                        name="phone"
+                        type="tel"
+                        autoComplete="tel"
+                        inputMode="tel"
+                        value={phone}
+                        onChange={(event) => {
+                          setPhone(event.target.value);
+                          if (error) setError('');
+                        }}
+                        placeholder={memberCardPage.phonePlaceholder}
+                        maxLength={120}
+                      />
+                    </div>
+
+                    <div className="field">
                       <label htmlFor="carte-departement">{memberCardPage.departmentLabel}</label>
                       <select
                         id="carte-departement"
@@ -176,6 +341,124 @@ export default function MemberCard() {
                           </option>
                         ))}
                       </select>
+                    </div>
+
+                    <div className="field">
+                      <span className="field-label">{memberCardPage.selfieLabel}</span>
+                      <div className="file-upload">
+                        <input
+                          ref={selfieRef}
+                          id="carte-selfie"
+                          name="selfie"
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={handleIdentityChange}
+                          className="visually-hidden"
+                        />
+                        {selfiePreview ? (
+                          <div className="file-preview">
+                            <img src={selfiePreview} alt="Selfie prévisualisé" />
+                            <button
+                              type="button"
+                              className="button button--quiet"
+                              onClick={removeSelfie}
+                              aria-label={memberCardPage.selfieRemove}
+                            >
+                              {memberCardPage.selfieRemove}
+                            </button>
+                          </div>
+                        ) : streamRef.current ? (
+                          <div className="camera-view">
+                            <video
+                              ref={cameraRef}
+                              autoPlay
+                              playsInline
+                              muted
+                              onClick={captureSelfie}
+                              className="camera-preview"
+                            />
+                            <button
+                              type="button"
+                              className="button button--solid"
+                              onClick={captureSelfie}
+                            >
+                              {memberCardPage.selfieCapture}
+                            </button>
+                            <button
+                              type="button"
+                              className="button button--quiet"
+                              onClick={stopCamera}
+                            >
+                              {memberCardPage.selfieRemove}
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            className="button button--outline"
+                            onClick={startCamera}
+                          >
+                            {memberCardPage.selfieCapture}
+                          </button>
+                        )}
+                        {selfieValueError ? (
+                          <p className="form-error">{selfieValueError}</p>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="field">
+                      <span className="field-label">{memberCardPage.identityLabel}</span>
+                      <div className="file-upload">
+                        <input
+                          ref={identityInputRef}
+                          id="carte-identite"
+                          name="identity"
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={handleIdentityChange}
+                          className="visually-hidden"
+                        />
+                        {identityPreview ? (
+                          <div className="file-preview">
+                            <img src={identityPreview} alt="Pièce d’identité prévisualisée" />
+                            <button
+                              type="button"
+                              className="button button--quiet"
+                              onClick={removeIdentity}
+                              aria-label={memberCardPage.identityRemove}
+                            >
+                              {memberCardPage.identityRemove}
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            className="button button--outline"
+                            onClick={() => identityInputRef.current?.click()}
+                          >
+                            {memberCardPage.identityPlaceholder}
+                          </button>
+                        )}
+                        {identityValueError ? (
+                          <p className="form-error">{identityValueError}</p>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="field field--check">
+                      <input
+                        id="carte-documents-accord"
+                        name="documentsConsent"
+                        type="checkbox"
+                        checked={documentsConsent}
+                        onChange={(event) => {
+                          setDocumentsConsent(event.target.checked);
+                          if (error) setError('');
+                        }}
+                        required
+                      />
+                      <label htmlFor="carte-documents-accord">{memberCardPage.documentsConsentLabel}</label>
                     </div>
 
                     <div className="field field--check">

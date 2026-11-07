@@ -119,16 +119,43 @@ export const api = {
     fullName: string;
     email: string;
     department?: string | null;
+    phone?: string | null;
     consent: boolean;
+    documentsConsent: boolean;
+    selfie?: File | null;
+    identity?: File | null;
   }): Promise<{
     ok: true;
     cardSent: boolean;
     memberNumber: string;
     message?: string;
   }> {
+    if (input.selfie || input.identity) {
+      const form = new FormData();
+      form.append('fullName', input.fullName);
+      form.append('email', input.email);
+      if (input.department) form.append('department', input.department);
+      if (input.phone) form.append('phone', input.phone);
+      form.append('consent', String(input.consent));
+      form.append('documentsConsent', String(input.documentsConsent));
+      if (input.selfie && input.selfie.size > 0) form.append('selfie', input.selfie, input.selfie.name);
+      if (input.identity && input.identity.size > 0) form.append('identity', input.identity, input.identity.name);
+      return request('/members', {
+        method: 'POST',
+        body: form,
+      });
+    }
+
     return request('/members', {
       method: 'POST',
-      body: JSON.stringify(input),
+      body: JSON.stringify({
+        fullName: input.fullName,
+        email: input.email,
+        department: input.department ?? null,
+        phone: input.phone ?? null,
+        consent: input.consent,
+        documentsConsent: input.documentsConsent,
+      }),
     });
   },
 
