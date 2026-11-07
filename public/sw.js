@@ -1,19 +1,34 @@
-const VERSION = 'union-offline-v2';
+const VERSION = 'union-offline-v3';
 const SHELL = `${VERSION}-shell`;
 const PAGES = `${VERSION}-pages`;
 const DATA = `${VERSION}-data`;
 
+function getBasePath() {
+  try {
+    const scopeUrl = new URL(self.registration.scope);
+    let p = scopeUrl.pathname;
+    if (!p.endsWith('/')) p += '/';
+    return p;
+  } catch {
+    return '/';
+  }
+}
+
 self.addEventListener('install', (event) => {
+  const base = getBasePath();
+  const shellUrls = [base, `${base}index.html`];
+  const dataUrl = `${base}data/edition.json`;
+
   event.waitUntil(
     caches
       .open(SHELL)
-      .then((cache) => Promise.allSettled([cache.add('/'), cache.add('/index.html')]))
+      .then((cache) => Promise.allSettled(shellUrls.map((u) => cache.add(u))))
       .catch(() => undefined),
   );
   event.waitUntil(
     caches
       .open(DATA)
-      .then((cache) => cache.add('/data/edition.json'))
+      .then((cache) => cache.add(dataUrl))
       .catch(() => undefined),
   );
   self.skipWaiting();
@@ -61,15 +76,14 @@ async function networkFirstData(request) {
 
 self.addEventListener('fetch', (event) => {
   const request = event.request;
-  if (
-    request.method === 'GET' &&
-    new URL(request.url).pathname.endsWith('/data/edition.json')
-  ) {
+  const url = new URL(request.url);
+
+  if (request.method === 'GET' && url.pathname.endsWith('/data/edition.json')) {
     event.respondWith(networkFirstData(request));
     return;
   }
   if (request.method !== 'GET' || request.mode !== 'navigate') return;
-  if (new URL(request.url).pathname.startsWith('/studio')) return;
+  if (url.pathname.includes('/studio')) return;
 
   event.respondWith(
     fetch(request)
@@ -88,7 +102,8 @@ self.addEventListener('fetch', (event) => {
       .catch(async () => {
         const cached = await caches.match(request);
         if (cached) return cached;
-        const shell = await caches.match('/index.html');
+        const base = getBasePath();
+        const shell = (await caches.match(`${base}index.html`)) || (await caches.match(base));
         if (shell) return shell;
         return new Response(
           '<!doctype html><html lang="fr"><meta charset="utf-8"><title>Hors ligne</title><body><h1>Page indisponible hors ligne</h1><p>Reconnectez-vous pour ouvrir cette page.</p></body></html>',

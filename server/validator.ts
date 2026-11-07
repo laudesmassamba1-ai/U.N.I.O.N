@@ -1,0 +1,112 @@
+export interface ValidationError {
+  field: string;
+  message: string;
+}
+
+export class ValidationException extends Error {
+  errors: ValidationError[];
+  constructor(errors: ValidationError[]) {
+    super(errors.map((e) => `${e.field}: ${e.message}`).join(', '));
+    this.name = 'ValidationException';
+    this.errors = errors;
+  }
+}
+
+export function validateSuggestionInput(data: unknown): {
+  text: string;
+  category: string;
+  department?: string | null;
+  proof?: string;
+} {
+  const errors: ValidationError[] = [];
+  if (!data || typeof data !== 'object') {
+    throw new ValidationException([{ field: 'body', message: 'Corps JSON attendu' }]);
+  }
+  const obj = data as Record<string, unknown>;
+
+  if (typeof obj.text !== 'string' || obj.text.trim().length < 20) {
+    errors.push({ field: 'text', message: 'La suggestion doit faire au moins 20 caractères' });
+  } else if (obj.text.trim().length > 600) {
+    errors.push({ field: 'text', message: 'La suggestion ne doit pas dépasser 600 caractères' });
+  }
+
+  if (typeof obj.category !== 'string' || !obj.category.trim()) {
+    errors.push({ field: 'category', message: 'La catégorie est obligatoire' });
+  }
+
+  const department = typeof obj.department === 'string' && obj.department.trim() ? obj.department.trim() : null;
+  const proof = typeof obj.proof === 'string' ? obj.proof.trim() : undefined;
+
+  if (errors.length > 0) {
+    throw new ValidationException(errors);
+  }
+
+  return {
+    text: (obj.text as string).trim(),
+    category: (obj.category as string).trim(),
+    department,
+    proof,
+  };
+}
+
+export function validateVoteInput(data: unknown): {
+  suggestionId: string;
+  value: 'useful' | 'not_useful';
+  token: string;
+} {
+  const errors: ValidationError[] = [];
+  if (!data || typeof data !== 'object') {
+    throw new ValidationException([{ field: 'body', message: 'Corps JSON attendu' }]);
+  }
+  const obj = data as Record<string, unknown>;
+
+  if (typeof obj.suggestionId !== 'string' || !obj.suggestionId.trim()) {
+    errors.push({ field: 'suggestionId', message: 'Identifiant de suggestion manquant' });
+  }
+
+  if (obj.value !== 'useful' && obj.value !== 'not_useful') {
+    errors.push({ field: 'value', message: "Valeur attendue : 'useful' ou 'not_useful'" });
+  }
+
+  if (typeof obj.token !== 'string' || !obj.token.trim()) {
+    errors.push({ field: 'token', message: 'Jeton de vote manquant' });
+  }
+
+  if (errors.length > 0) {
+    throw new ValidationException(errors);
+  }
+
+  return {
+    suggestionId: (obj.suggestionId as string).trim(),
+    value: obj.value as 'useful' | 'not_useful',
+    token: (obj.token as string).trim(),
+  };
+}
+
+export function validateReportInput(data: unknown): {
+  suggestionId: string;
+  reason: string;
+} {
+  const errors: ValidationError[] = [];
+  if (!data || typeof data !== 'object') {
+    throw new ValidationException([{ field: 'body', message: 'Corps JSON attendu' }]);
+  }
+  const obj = data as Record<string, unknown>;
+
+  if (typeof obj.suggestionId !== 'string' || !obj.suggestionId.trim()) {
+    errors.push({ field: 'suggestionId', message: 'Identifiant de suggestion manquant' });
+  }
+
+  if (typeof obj.reason !== 'string' || !obj.reason.trim()) {
+    errors.push({ field: 'reason', message: 'Motif du signalement obligatoire' });
+  }
+
+  if (errors.length > 0) {
+    throw new ValidationException(errors);
+  }
+
+  return {
+    suggestionId: (obj.suggestionId as string).trim(),
+    reason: (obj.reason as string).trim(),
+  };
+}

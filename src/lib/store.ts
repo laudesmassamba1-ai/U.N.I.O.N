@@ -539,6 +539,55 @@ export function applyVote(
   };
 }
 
+export function setVoteState(
+  database: DatabaseShape,
+  suggestionId: string,
+  voterHash: string,
+  myVote: VoteValue | null,
+  counts: { useful: number; notUseful: number },
+  status?: Suggestion['status'],
+): DatabaseShape {
+  const timestamp = nowIso();
+  const existing = database.votes.find(
+    (vote) => vote.suggestionId === suggestionId && vote.voterHash === voterHash,
+  );
+  const votes = myVote
+    ? existing
+      ? database.votes.map((vote) =>
+          vote.suggestionId === suggestionId && vote.voterHash === voterHash
+            ? { ...vote, value: myVote, updatedAt: timestamp }
+            : vote,
+        )
+      : [
+          ...database.votes,
+          {
+            suggestionId,
+            voterHash,
+            value: myVote,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          } satisfies SuggestionVote,
+        ]
+    : database.votes.filter(
+        (vote) => !(vote.suggestionId === suggestionId && vote.voterHash === voterHash),
+      );
+  return {
+    ...database,
+    votes,
+    suggestions: database.suggestions.map((item) =>
+      item.id === suggestionId
+        ? {
+            ...item,
+            votesUseful: counts.useful,
+            votesNotUseful: counts.notUseful,
+            status: status ?? item.status,
+            updatedAt: timestamp,
+          }
+        : item,
+    ),
+  };
+}
+
 export function addReport(
   database: DatabaseShape,
   suggestionId: string,

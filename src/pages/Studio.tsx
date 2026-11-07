@@ -13,40 +13,23 @@ import {
 import { editionLabel } from '../lib/articles';
 import type { EditionDocument } from '../lib/edition';
 import {
-  buildBackup,
   buildPublicEdition,
   downloadEdition,
   EDITION_PATH,
-  EditionError,
-  fetchRemoteEdition,
-  getAppliedEditionRevision,
-  mergeEdition,
-  readEditionFile,
   serialiseEdition,
-  setAppliedEditionRevision,
 } from '../lib/edition';
 import { formatDate, formatDateTime, nowIso, weekBounds } from '../lib/dates';
 import { createId, uniqueSlug } from '../lib/id';
 import { statusTone } from '../lib/suggestions';
 import {
   articleFromDraft,
-  approveSuggestion,
-  archiveArticle,
   dbStore,
   getStudioSession,
-  mergeSuggestion,
-  publishArticle,
   refreshSuggestionStatuses,
-  respondToSuggestion,
-  restoreArticle,
-  saveDraft,
-  saveSettings,
   setStudioSession,
-  setSuggestionStatus,
-  softDeleteArticle,
-  unpublishArticle,
-  upsertArticle,
 } from '../lib/store';
+import { api } from '../lib/api';
+import type { StudioUser } from '../lib/api';
 import { useDatabase, useRouteTitle } from '../lib/hooks';
 import type {
   Article,
@@ -55,9 +38,38 @@ import type {
   SuggestionSettings,
 } from '../types';
 
-const STUDIO_CODE = (import.meta.env.VITE_STUDIO_CODE ?? 'union').trim();
-
 type StudioTab = 'journal' | 'moderation' | 'settings' | 'edition';
+
+function errorText(reason: unknown): string {
+  return reason instanceof Error ? reason.message : 'L’opération a échoué. Réessayez.';
+}
+
+function storeServerArticle(article: Article): void {
+  const current = dbStore.getSnapshot();
+  const exists = current.articles.some((item) => item.id === article.id);
+  dbStore.replace({
+    ...current,
+    articles: exists
+      ? current.articles.map((item) => (item.id === article.id ? article : item))
+      : [article, ...current.articles],
+  });
+}
+
+async function refreshStudioFromServer(): Promise<void> {
+  const [articles, suggestions, settings, audit] = await Promise.all([
+    api.studioGetArticles(),
+    api.studioGetSuggestions(),
+    api.studioGetSettings(),
+    api.studioGetAudit(),
+  ]);
+  dbStore.replace({
+    ...dbStore.getSnapshot(),
+    articles: articles.articles,
+    suggestions: suggestions.suggestions,
+    settings: settings.settings,
+    audit: audit.audit,
+  });
+}
 
 function makeBlock(type: ArticleBlock['type']): ArticleBlock {
   const id = createId('block');
@@ -77,16 +89,22 @@ function makeBlock(type: ArticleBlock['type']): ArticleBlock {
   }
 }
 
-function StudioGate({ onOpen }: { onOpen: () => void }) {
+function StudioGate({ onOpen }: { onOpen: (user: StudioUser) => void }) {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const [busy, setBusy] = useState(false);
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (code.trim() === STUDIO_CODE) {
+    setError('');
+    setBusy(true);
+    try {
+      const result = await api.studioLogin(code.trim());
       setStudioSession(true);
-      onOpen();
-    } else {
-      setError(studioContent.invalid);
+      onOpen(result.user);
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setBusy(false);
     }
   };
   return (
@@ -112,17 +130,16 @@ function StudioGate({ onOpen }: { onOpen: () => void }) {
             />
           </div>
           <div aria-live="polite">{error ? <p className="form-error">{error}</p> : null}</div>
-          <button type="submit" className="button button--solid">
-            {studioContent.enter}
+          <button type="submit" className="button button--solid" disabled={busy}>
+            {busy ? 'Vérification…' : studioContent.enter}
             <span className="arrow" aria-hidden="true">
               →
             </span>
           </button>
         </form>
         <p className="note">
-          Cette version conserve les articles et les suggestions dans le navigateur. En
-          production, l’accès se fait par invitation, avec authentification forte et sessions
-          courtes.
+          L’accès est vérifié par le serveur. La session est signée, limitée à deux heures et
+          conservée dans un cookie HttpOnly.
         </p>
         <p>
           <Link to="/" className="text-link">
@@ -134,14 +151,14 @@ function StudioGate({ onOpen }: { onOpen: () => void }) {
   );
 }
 
-function StudioBar({ onLogout }: { onLogout: () => void }) {
+function StudioBar({ onLogout, user }: { onLogout: () => void; user: StudioUser | null }) {
   return (
     <header className="studio-bar">
       <Link to="/studio" className="studio-bar__brand">
         <Logo size={44} />
         <span>
           <strong>{studioContent.title}</strong>
-          <small>{studioContent.subtitle}</small>
+          <small>{user ? `${studioContent.subtitle} · ${user.username}` : studioContent.subtitle}</small>
         </span>
       </Link>
       <div className="studio-bar__actions">
@@ -440,9 +457,13 @@ function ArticlePreview({ article }: { article: Article }) {
 function ArticleEditor({ article, onClose }: { article: Article; onClose: () => void }) {
   const database = useDatabase();
   const [draft, setDraft] = useState<Article>(article);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   const [dirty, setDirty] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(article.updatedAt);
   const [errors, setErrors] = useState<string[]>([]);
+  const [syncError, setSyncError] = useState('');
+  const [syncing, setSyncing] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [sourcesText, setSourcesText] = useState(article.sources.join('\n'));
 
@@ -452,6 +473,7 @@ function ArticleEditor({ article, onClose }: { article: Article; onClose: () => 
     setDirty(false);
     setSavedAt(article.updatedAt);
     setErrors([]);
+    setSyncError('');
   }, [article.id]);
 
   const update = (patch: Partial<Article>) => {
@@ -461,10 +483,24 @@ function ArticleEditor({ article, onClose }: { article: Article; onClose: () => 
 
   useEffect(() => {
     if (!dirty) return;
-    const timer = window.setTimeout(() => {
-      dbStore.update((current) => saveDraft(current, { ...draft, sources: sourcesText.split('\n').filter(Boolean) }));
-      setSavedAt(nowIso());
-      setDirty(false);
+    const timer = window.setTimeout(async () => {
+      const next = {
+        ...draft,
+        sources: sourcesText.split('\n').filter(Boolean),
+      };
+      setSyncing(true);
+      try {
+        const result = await api.studioSaveArticle({ ...next, recordRevision: false });
+        const saved = result.article ?? next;
+        storeServerArticle(saved);
+        setSavedAt(saved.updatedAt);
+        setSyncError('');
+        if (JSON.stringify(draftRef.current) === JSON.stringify(next)) setDirty(false);
+      } catch (reason) {
+        setSyncError(errorText(reason));
+      } finally {
+        setSyncing(false);
+      }
     }, 900);
     return () => window.clearTimeout(timer);
   }, [draft, dirty, sourcesText]);
@@ -496,19 +532,37 @@ function ArticleEditor({ article, onClose }: { article: Article; onClose: () => 
     return Array.from(new Set(problems));
   };
 
-  const saveManual = () => {
-    const next = { ...draft, sources: sourcesText.split('\n').filter(Boolean) };
-    dbStore.update((current) => upsertArticle(current, next, 'Brouillon sauvegardé'));
-    const saved = dbStore.getSnapshot().articles.find((item) => item.id === draft.id);
-    if (saved) {
+  const persist = async (next: Article, summary: string): Promise<Article> => {
+    setSyncing(true);
+    setSyncError('');
+    try {
+      const result = await api.studioSaveArticle({ ...next, revisionSummary: summary });
+      const saved = result.article ?? next;
+      storeServerArticle(saved);
       setDraft(saved);
       setSavedAt(saved.updatedAt);
+      setDirty(false);
+      return saved;
+    } catch (reason) {
+      const message = errorText(reason);
+      setSyncError(message);
+      throw new Error(message);
+    } finally {
+      setSyncing(false);
     }
-    setDirty(false);
-    setErrors([]);
   };
 
-  const publish = () => {
+  const saveManual = async () => {
+    const next = { ...draft, sources: sourcesText.split('\n').filter(Boolean) };
+    try {
+      await persist(next, 'Brouillon sauvegardé');
+      setErrors([]);
+    } catch {
+      // Message déjà affiché.
+    }
+  };
+
+  const publish = async () => {
     const problems = validate();
     if (problems.length > 0) {
       setErrors(problems);
@@ -519,47 +573,70 @@ function ArticleEditor({ article, onClose }: { article: Article; onClose: () => 
     const next: Article = {
       ...draft,
       slug,
+      status: 'published',
       sources: sourcesText.split('\n').filter(Boolean),
       weekNumber: draft.weekNumber || bounds?.weekNumber || weekBounds().weekNumber,
       weekStart: draft.weekStart || bounds?.weekStart || weekBounds().weekStart,
       weekEnd: draft.weekEnd || bounds?.weekEnd || weekBounds().weekEnd,
       publishedAt: draft.publishedAt ?? nowIso(),
+      archivedAt: null,
+      deletedAt: null,
     };
-    dbStore.update((current) => publishArticle(current, next));
-    const saved = dbStore.getSnapshot().articles.find((item) => item.id === draft.id);
-    if (saved) {
-      setDraft(saved);
-      setSavedAt(saved.updatedAt);
+    try {
+      await persist(next, next.status === 'published' ? 'Publication' : 'Mise à jour');
+      setErrors([]);
+    } catch (reason) {
+      setErrors([errorText(reason)]);
     }
-    setDirty(false);
-    setErrors([]);
   };
 
-  const unpublish = () => {
-    dbStore.update((current) => unpublishArticle(current, draft));
-    const saved = dbStore.getSnapshot().articles.find((item) => item.id === draft.id);
-    if (saved) setDraft(saved);
+  const unpublish = async () => {
+    try {
+      await persist({ ...draft, status: 'draft', archivedAt: null, deletedAt: null }, 'Dépublication');
+    } catch {
+      // Message déjà affiché.
+    }
   };
 
-  const archive = () => {
+  const archive = async () => {
     if (!window.confirm('Archiver cet article ?')) return;
-    dbStore.update((current) => archiveArticle(current, draft));
-    onClose();
+    try {
+      await persist(
+        { ...draft, status: 'archived', archivedAt: nowIso(), deletedAt: null },
+        'Archivage',
+      );
+      onClose();
+    } catch {
+      // Message déjà affiché.
+    }
   };
 
-  const remove = () => {
+  const remove = async () => {
     if (!window.confirm('Supprimer cet article ? La suppression est douce et réversible.')) return;
-    dbStore.update((current) => softDeleteArticle(current, draft));
-    onClose();
+    try {
+      await persist(
+        { ...draft, status: 'archived', archivedAt: draft.archivedAt ?? nowIso(), deletedAt: nowIso() },
+        'Suppression douce',
+      );
+      await refreshStudioFromServer();
+      onClose();
+    } catch {
+      // Message déjà affiché.
+    }
   };
 
-  const restore = () => {
-    dbStore.update((current) => restoreArticle(current, draft));
-    const saved = dbStore.getSnapshot().articles.find((item) => item.id === draft.id);
-    if (saved) setDraft(saved);
+  const restore = async () => {
+    try {
+      await persist(
+        { ...draft, status: 'draft', archivedAt: null, deletedAt: null },
+        'Restauration',
+      );
+    } catch {
+      // Message déjà affiché.
+    }
   };
 
-  const restoreRevision = (revisionId: string) => {
+  const restoreRevision = async (revisionId: string) => {
     const revision = draft.revisions.find((item) => item.id === revisionId);
     if (!revision) return;
     if (!window.confirm('Revenir à cette version ? La version actuelle sera conservée dans l’historique.')) {
@@ -573,11 +650,11 @@ function ArticleEditor({ article, onClose }: { article: Article; onClose: () => 
       leadImage: revision.leadImage,
       sources: revision.sources,
     };
-    dbStore.update((current) => upsertArticle(current, next, 'Version restaurée'));
-    const saved = dbStore.getSnapshot().articles.find((item) => item.id === draft.id);
-    if (saved) {
-      setDraft(saved);
+    try {
+      const saved = await persist(next, 'Version restaurée');
       setSourcesText(saved.sources.join('\n'));
+    } catch {
+      // Message déjà affiché.
     }
   };
 
@@ -587,22 +664,26 @@ function ArticleEditor({ article, onClose }: { article: Article; onClose: () => 
         <div>
           <p className="eyebrow">{studioContent.tabs.journal}</p>
           <h1>{draft.title || studioContent.newArticle}</h1>
-          <p className="note">
-            {dirty
-              ? 'Modifications en attente.'
-              : savedAt
-                ? `${studioContent.autoSaved} ${formatDateTime(savedAt)}`
-                : ''}
+          <p className={`note${syncError ? ' form-error' : ''}`} role={syncError ? 'alert' : undefined}>
+            {syncError
+              ? syncError
+              : syncing
+                ? 'Synchronisation avec le serveur…'
+                : dirty
+                  ? 'Modifications en attente.'
+                  : savedAt
+                    ? `${studioContent.autoSaved} ${formatDateTime(savedAt)}`
+                    : ''}
           </p>
         </div>
         <div className="editor__head-actions">
           <button type="button" className="button button--quiet" onClick={onClose}>
             {studioContent.close}
           </button>
-          <button type="button" className="button button--outline" onClick={saveManual}>
+          <button type="button" className="button button--outline" onClick={saveManual} disabled={syncing}>
             {studioContent.save}
           </button>
-          <button type="button" className="button button--solid" onClick={publish}>
+          <button type="button" className="button button--solid" onClick={publish} disabled={syncing}>
             {draft.status === 'published' ? 'Mettre à jour' : studioContent.saveAndPublish}
           </button>
         </div>
@@ -800,6 +881,8 @@ function ArticleEditor({ article, onClose }: { article: Article; onClose: () => 
 function ArticlesPanel() {
   const database = useDatabase();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState('');
   const editing = database.articles.find((article) => article.id === editingId) ?? null;
   const articles = [...database.articles].sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
@@ -809,10 +892,20 @@ function ArticlesPanel() {
     return <ArticleEditor article={editing} onClose={() => setEditingId(null)} />;
   }
 
-  const create = () => {
+  const create = async () => {
+    setError('');
+    setCreating(true);
     const draft = articleFromDraft();
-    dbStore.update((current) => saveDraft(current, draft));
-    setEditingId(draft.id);
+    try {
+      const result = await api.studioSaveArticle(draft);
+      const saved = result.article ?? draft;
+      storeServerArticle(saved);
+      setEditingId(saved.id);
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -822,13 +915,14 @@ function ArticlesPanel() {
           <p className="eyebrow">{studioContent.tabs.journal}</p>
           <h1>Articles</h1>
         </div>
-        <button type="button" className="button button--solid" onClick={create}>
-          {studioContent.newArticle}
+        <button type="button" className="button button--solid" onClick={create} disabled={creating}>
+          {creating ? 'Création…' : studioContent.newArticle}
           <span className="arrow" aria-hidden="true">
             +
           </span>
         </button>
       </div>
+      <div aria-live="assertive">{error ? <p className="form-error">{error}</p> : null}</div>
 
       {articles.length === 0 ? (
         <p className="empty-line">{studioContent.emptyArticles}</p>
@@ -882,10 +976,24 @@ function ArticlesPanel() {
 
 function ResponseForm({ suggestion }: { suggestion: Suggestion }) {
   const [text, setText] = useState(suggestion.response?.text ?? '');
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState('');
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!text.trim()) return;
-    dbStore.update((current) => respondToSuggestion(current, suggestion.id, text));
+    setBusy(true);
+    setError('');
+    setSaved('');
+    try {
+      await api.studioModerateSuggestion(suggestion.id, 'response', { response: text });
+      await refreshStudioFromServer();
+      setSaved('Réponse publiée sur la page publique.');
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setBusy(false);
+    }
   };
   return (
     <form className="response-form" onSubmit={submit}>
@@ -897,27 +1005,48 @@ function ResponseForm({ suggestion }: { suggestion: Suggestion }) {
         rows={3}
         placeholder={studioContent.moderation.responsePlaceholder}
       />
-      <button type="submit" className="button button--outline">
-        {studioContent.moderation.saveResponse}
+      <button type="submit" className="button button--outline" disabled={busy}>
+        {busy ? 'Publication…' : studioContent.moderation.saveResponse}
       </button>
+      <div aria-live="polite">{saved ? <p className="note">{saved}</p> : null}</div>
+      <div aria-live="assertive">{error ? <p className="form-error">{error}</p> : null}</div>
     </form>
   );
 }
 
 function SuggestionRow({ suggestion }: { suggestion: Suggestion }) {
-  const approve = () => dbStore.update((current) => approveSuggestion(current, suggestion.id));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const run = async (action: () => Promise<unknown>) => {
+    setBusy(true);
+    setError('');
+    try {
+      await action();
+      await refreshStudioFromServer();
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const approve = () =>
+    run(() => api.studioModerateSuggestion(suggestion.id, 'approve'));
   const hide = () => {
     if (!window.confirm('Masquer cette suggestion de la liste publique ?')) return;
-    dbStore.update((current) => setSuggestionStatus(current, suggestion.id, 'archived', 'Suggestion masquée'));
+    return run(() => api.studioModerateSuggestion(suggestion.id, 'archive'));
   };
   const restore = () =>
-    dbStore.update((current) => setSuggestionStatus(current, suggestion.id, 'discussion', 'Suggestion remise en discussion'));
-  const mark = (status: Suggestion['status'], label: string) =>
-    dbStore.update((current) => setSuggestionStatus(current, suggestion.id, status, label));
+    run(() => api.studioModerateSuggestion(suggestion.id, 'status', { status: 'discussion' }));
+  const mark = (status: Suggestion['status']) =>
+    run(() => api.studioModerateSuggestion(suggestion.id, 'status', { status }));
   const merge = () => {
     const target = window.prompt(studioContent.moderation.mergePrompt);
     if (!target || target === suggestion.id) return;
-    dbStore.update((current) => mergeSuggestion(current, suggestion.id, target));
+    return run(() =>
+      api.studioModerateSuggestion(suggestion.id, 'merge', { duplicateOf: target }),
+    );
   };
 
   return (
@@ -946,34 +1075,38 @@ function SuggestionRow({ suggestion }: { suggestion: Suggestion }) {
         <span>{`${studioContent.moderation.reports} : ${suggestion.reportCount}`}</span>
         <span>{suggestion.status}</span>
       </div>
+      {error ? <p className="form-error" role="alert">{error}</p> : null}
 
       <div className="moderation-item__actions">
         {suggestion.status === 'pending' ? (
-          <button type="button" className="button button--solid" onClick={approve}>
+          <button type="button" className="button button--solid" onClick={approve} disabled={busy}>
             {studioContent.moderation.approve}
           </button>
         ) : null}
         {suggestion.status !== 'archived' ? (
-          <button type="button" className="button button--quiet" onClick={hide}>
+          <button type="button" className="button button--quiet" onClick={hide} disabled={busy}>
             {studioContent.moderation.hide}
           </button>
         ) : (
-          <button type="button" className="button button--quiet" onClick={restore}>
+          <button type="button" className="button button--quiet" onClick={restore} disabled={busy}>
             {studioContent.moderation.restore}
           </button>
         )}
         {suggestion.status === 'retained' || suggestion.status === 'discussion' ? (
           <>
-            <button type="button" className="button button--quiet" onClick={() => mark('integrated', 'Suggestion intégrée')}>
+            <button type="button" className="button button--quiet" onClick={() => mark('adapted')} disabled={busy}>
+              {studioContent.moderation.setAdapted}
+            </button>
+            <button type="button" className="button button--quiet" onClick={() => mark('integrated')} disabled={busy}>
               {studioContent.moderation.setIntegrated}
             </button>
-            <button type="button" className="button button--quiet" onClick={merge}>
+            <button type="button" className="button button--quiet" onClick={merge} disabled={busy}>
               {studioContent.moderation.merge}
             </button>
           </>
         ) : null}
         {suggestion.status === 'adapted' ? (
-          <button type="button" className="button button--quiet" onClick={() => mark('integrated', 'Suggestion intégrée')}>
+          <button type="button" className="button button--quiet" onClick={() => mark('integrated')} disabled={busy}>
             {studioContent.moderation.setIntegrated}
           </button>
         ) : null}
@@ -1039,17 +1172,35 @@ function ModerationPanel() {
 function SettingsPanel() {
   const database = useDatabase();
   const [settings, setSettings] = useState<SuggestionSettings>(database.settings);
-  const save = (event: FormEvent<HTMLFormElement>) => {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  useEffect(() => {
+    setSettings(database.settings);
+  }, [database.settings]);
+  const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    saveSettings({
+    setBusy(true);
+    setMessage('');
+    setError('');
+    const next: SuggestionSettings = {
       retainedVotes: Number(settings.retainedVotes),
       retainedShare: Number(settings.retainedShare),
       archivedVotes: Number(settings.archivedVotes),
       archivedShare: Number(settings.archivedShare),
       expiryDays: Number(settings.expiryDays),
       retentionDays: Number(settings.retentionDays),
-    });
-    dbStore.update((current) => refreshSuggestionStatuses(current));
+    };
+    try {
+      await api.studioSaveSettings(next);
+      await refreshStudioFromServer();
+      dbStore.update((current) => refreshSuggestionStatuses(current));
+      setMessage(studioContent.settings.saved);
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setBusy(false);
+    }
   };
   return (
     <div className="studio-panel">
@@ -1128,9 +1279,11 @@ function SettingsPanel() {
             />
           </div>
         </div>
-        <button type="submit" className="button button--solid">
+        <button type="submit" className="button button--solid" disabled={busy}>
           {studioContent.settings.save}
         </button>
+        <div aria-live="polite">{message ? <p className="note">{message}</p> : null}</div>
+        <div aria-live="assertive">{error ? <p className="form-error">{error}</p> : null}</div>
       </form>
 
       <div className="privacy-note">
@@ -1168,87 +1321,41 @@ function formatBytes(bytes: number): string {
 
 function EditionPanel() {
   const database = useDatabase();
+  const [backup, setBackup] = useState<EditionDocument | null>(null);
+  const [backupError, setBackupError] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [remote, setRemote] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [appliedRevision, setAppliedRevisionState] = useState(() =>
-    getAppliedEditionRevision(),
-  );
-  const fileRef = useRef<HTMLInputElement>(null);
   const publicEdition = useMemo(() => buildPublicEdition(database), [database]);
-  const backup = useMemo(() => buildBackup(database), [database]);
   const publicSize = useMemo(
     () => new Blob([serialiseEdition(publicEdition)]).size,
     [publicEdition],
   );
-  const backupSize = useMemo(() => new Blob([serialiseEdition(backup)]).size, [backup]);
+  const backupSize = useMemo(
+    () => (backup ? new Blob([serialiseEdition(backup)]).size : 0),
+    [backup],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    api.studioGetBackup()
+      .then((document) => {
+        if (cancelled) return;
+        setBackup(document);
+        setBackupError('');
+      })
+      .catch((reason) => {
+        if (cancelled) return;
+        setBackupError(errorText(reason));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const download = (document: EditionDocument, label: string) => {
     downloadEdition(document);
     setError('');
-    setMessage(
-      `${label}. Remplacez ${EDITION_PATH} par le fichier téléchargé, puis redéployez le site.`,
-    );
-  };
-
-  const importFile = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setError('');
-    setMessage('');
-    try {
-      const document = await readEditionFile(file);
-      if (!window.confirm(studioContent.edition.importConfirm)) return;
-      dbStore.replace(mergeEdition(dbStore.getSnapshot(), document));
-      setAppliedEditionRevision(document.revision);
-      setAppliedRevisionState(document.revision);
-      setMessage(
-        `${studioContent.edition.imported} : révision ${document.revision}, ${formatDateTime(document.updatedAt)}.`,
-      );
-    } catch (reason) {
-      setError(reason instanceof EditionError ? reason.message : 'Fichier illisible.');
-    } finally {
-      if (fileRef.current) fileRef.current.value = '';
-    }
-  };
-
-  const checkRemote = async () => {
-    setBusy(true);
-    setError('');
-    setMessage('');
-    setRemote('');
-    try {
-      const document = await fetchRemoteEdition();
-      if (!document) {
-        setError(studioContent.edition.remoteMissing);
-        return;
-      }
-      setRemote(
-        `Révision ${document.revision}. ${document.articles.length} article(s), ${document.suggestions.length} suggestion(s). ${formatDateTime(document.updatedAt)}.`,
-      );
-      if (document.revision > getAppliedEditionRevision()) {
-        dbStore.replace(mergeEdition(dbStore.getSnapshot(), document));
-        setAppliedEditionRevision(document.revision);
-        setAppliedRevisionState(document.revision);
-        setMessage(studioContent.edition.remoteApplied);
-      } else {
-        setMessage(studioContent.edition.remoteSkipped);
-      }
-    } catch {
-      setError(studioContent.edition.remoteInvalid);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const reset = () => {
-    if (!window.confirm(studioContent.edition.resetConfirm)) return;
-    dbStore.reset();
-    setAppliedEditionRevision(0);
-    setAppliedRevisionState(0);
-    setError('');
-    setMessage(studioContent.edition.resetDone);
+    setMessage(`${label} : ${studioContent.edition.downloadDone}`);
   };
 
   return (
@@ -1282,51 +1389,28 @@ function EditionPanel() {
         <section className="edition-card">
           <h2>{studioContent.edition.backupTitle}</h2>
           <p>{studioContent.edition.backupText}</p>
-          <p className="note">{formatBytes(backupSize)}</p>
+          <p className="note">
+            {backup ? formatBytes(backupSize) : studioContent.edition.backupLoading}
+          </p>
           <button
             type="button"
             className="button button--outline"
-            onClick={() => download(backup, studioContent.edition.downloadBackup)}
+            onClick={() => backup && download(backup, studioContent.edition.downloadBackup)}
+            disabled={!backup}
           >
             {studioContent.edition.downloadBackup}
           </button>
+          {backupError ? <p className="form-error">{backupError}</p> : null}
         </section>
       </div>
 
       <div className="edition-status">
-        <p>{`${studioContent.edition.revision} : ${appliedRevision}`}</p>
+        {backup ? (
+          <p>{`${studioContent.edition.backupRevision} : ${backup.revision} · ${formatDateTime(backup.updatedAt)}`}</p>
+        ) : null}
         <p>
           {studioContent.edition.path} : <code>{EDITION_PATH}</code>
         </p>
-        {remote ? <p>{remote}</p> : null}
-      </div>
-
-      <div className="edition-actions">
-        <button
-          type="button"
-          className="button button--outline"
-          onClick={checkRemote}
-          disabled={busy}
-        >
-          {studioContent.edition.remoteButton}
-        </button>
-        <button
-          type="button"
-          className="button button--outline"
-          onClick={() => fileRef.current?.click()}
-        >
-          {studioContent.edition.importButton}
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="application/json,.json"
-          onChange={importFile}
-          hidden
-        />
-        <button type="button" className="button button--quiet" onClick={reset}>
-          {studioContent.edition.reset}
-        </button>
       </div>
 
       <div aria-live="polite">
@@ -1347,7 +1431,33 @@ function EditionPanel() {
 export default function Studio() {
   useRouteTitle(studioContent.title);
   const [open, setOpen] = useState(() => getStudioSession());
+  const [user, setUser] = useState<StudioUser | null>(null);
+  const [checking, setChecking] = useState(() => getStudioSession());
   const [tab, setTab] = useState<StudioTab>('journal');
+
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    setChecking(true);
+    api.studioGetMe()
+      .then((result) => {
+        if (!alive) return;
+        setUser(result.user);
+        return refreshStudioFromServer();
+      })
+      .catch(() => {
+        if (!alive) return;
+        setStudioSession(false);
+        setUser(null);
+        setOpen(false);
+      })
+      .finally(() => {
+        if (alive) setChecking(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -1357,21 +1467,32 @@ export default function Studio() {
   if (!open) {
     return (
       <StudioGate
-        onOpen={() => {
+        onOpen={(nextUser) => {
+          setUser(nextUser);
           setOpen(true);
         }}
       />
     );
   }
 
-  const logout = () => {
+  if (checking && !user) {
+    return <p className="loading">Vérification de la session.</p>;
+  }
+
+  const logout = async () => {
+    try {
+      await api.studioLogout();
+    } catch {
+      // La session locale est fermée même si le serveur est indisponible.
+    }
     setStudioSession(false);
+    setUser(null);
     setOpen(false);
   };
 
   return (
     <div className="studio">
-      <StudioBar onLogout={logout} />
+      <StudioBar onLogout={logout} user={user} />
       <div className="studio-tabs" role="tablist" aria-label="Sections du Studio">
         {(
           [

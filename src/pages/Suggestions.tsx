@@ -25,14 +25,14 @@ import {
 } from '../lib/moderation';
 import {
   addReport,
-  applyVote,
-  createSuggestion,
   dbStore,
   getVoterToken,
   readSuggestionAttempts,
   refreshSuggestionStatuses,
+  setVoteState,
   writeSuggestionAttempts,
 } from '../lib/store';
+import { api } from '../lib/api';
 import { useDatabase, useRouteTitle } from '../lib/hooks';
 import type { Suggestion, VoteValue } from '../types';
 
@@ -69,7 +69,8 @@ export default function Suggestions() {
   const [submitting, setSubmitting] = useState(false);
   const [received, setReceived] = useState(false);
   const [voterHash, setVoterHash] = useState('');
-  const [message, setMessage] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionError, setActionError] = useState('');
   const refreshed = useRef(false);
 
   useEffect(() => {
@@ -110,13 +111,31 @@ export default function Suggestions() {
     [database.suggestions],
   );
 
-  const voteFor = (suggestion: Suggestion, value: VoteValue) => {
+  const voteFor = async (suggestion: Suggestion, value: VoteValue) => {
     if (!voterHash || !VOTABLE_STATUSES.includes(suggestion.status)) return;
-    setMessage(suggestionsPage.voteRecorded);
-    dbStore.update((current) => {
-      const voted = applyVote(current, suggestion.id, voterHash, value);
-      return refreshSuggestionStatuses(voted);
-    });
+    setActionError('');
+    setActionMessage('');
+    try {
+      const token = getVoterToken();
+      const result = await api.submitVote(suggestion.id, value, token);
+      dbStore.update((current) =>
+        setVoteState(
+          current,
+          suggestion.id,
+          voterHash,
+          result.myVote,
+          { useful: result.votesUseful, notUseful: result.votesNotUseful },
+          result.status,
+        ),
+      );
+      setActionMessage(suggestionsPage.voteRecorded);
+    } catch (reason) {
+      setActionError(
+        reason instanceof Error
+          ? reason.message
+          : 'Votre vote n’a pas été transmis. Réessayez.',
+      );
+    }
   };
 
   const hasVoted = (suggestion: Suggestion) =>
@@ -153,31 +172,48 @@ export default function Suggestions() {
     }
     setSubmitting(true);
     try {
-      await proofOfWork(text.trim(), 2);
-      dbStore.update((current) => {
-        const created = createSuggestion(current, {
+      const pow = await proofOfWork(text.trim(), 2);
+      let res;
+      try {
+        res = await api.submitSuggestion({
           text,
           category,
           department: department || null,
+          proof: String(pow.nonce),
         });
-        return refreshSuggestionStatuses(created.database);
-      });
+      } catch (apiErr: any) {
+        setError(apiErr.message || 'Impossible d’enregistrer la suggestion.');
+        return;
+      }
       writeSuggestionAttempts(recordAttempt(attempts, now));
       setText('');
       setCategory('');
       setDepartment('');
       setReceived(true);
-      setMessage('');
+      setActionMessage(res?.message || 'Suggestion reçue. Elle sera examinée par le bureau.');
+    } catch {
+      setError('Erreur lors du traitement de la suggestion.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const report = (suggestion: Suggestion) => {
-    dbStore.update((current) =>
-      addReport(current, suggestion.id, 'Signalement depuis la page publique'),
-    );
-    setMessage('Signalement transmis au bureau.');
+  const report = async (suggestion: Suggestion) => {
+    setActionError('');
+    setActionMessage('');
+    try {
+      await api.submitReport(suggestion.id, 'Signalement depuis la page publique');
+      dbStore.update((current) =>
+        addReport(current, suggestion.id, 'Signalement depuis la page publique'),
+      );
+      setActionMessage('Signalement transmis au bureau.');
+    } catch (reason) {
+      setActionError(
+        reason instanceof Error
+          ? reason.message
+          : 'Le signalement n’a pas été transmis. Réessayez.',
+      );
+    }
   };
 
   const remaining = SUGGESTION_MAX - text.length;
@@ -318,9 +354,12 @@ export default function Suggestions() {
             title={suggestionsPage.listTitle}
             intro={suggestionsPage.voteIndicative}
           />
-          <p className="sr-only" aria-live="polite">
-            {message}
-          </p>
+          <div aria-live="polite">
+            {actionMessage ? <p className="note">{actionMessage}</p> : null}
+          </div>
+          <div aria-live="assertive">
+            {actionError ? <p className="form-error">{actionError}</p> : null}
+          </div>
           {publicSuggestions.length === 0 ? (
             <p className="empty-line">{suggestionsPage.emptyList}</p>
           ) : (

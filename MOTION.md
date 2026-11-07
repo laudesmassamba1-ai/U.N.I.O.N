@@ -30,6 +30,8 @@ Trois blocs collants, dans l’ordre :
 
 Chaque scène tient sur une hauteur de défilement, avec un titre, un texte court et un repère visuel. En mouvement réduit, les blocs deviennent statiques et s’empilent normalement.
 
+Le troisième repère montre deux pièces réellement différentes : à gauche une plaque chanfreinée à deux tenons de profondeurs inégales, à droite une pièce à bord incliné, encoche en V et deux mortaises. Les deux tracés partagent le même joint, si bien qu’à l’arrivée il n’y a ni jour ni recouvrement. La ligne de joint se trace en vert quand l’assemblage est complet.
+
 Fichier : `src/components/ThreeScenes.tsx`.
 
 ## Carte des départements

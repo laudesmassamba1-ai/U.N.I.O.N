@@ -3,7 +3,8 @@ import { ArticleCard } from '../components/ArticleCard';
 import { Link } from '../components/Link';
 import { PageHeader } from '../components/Layout';
 import { Container, EmptyState, Section } from '../components/ui';
-import { departments, journalPage } from '../content/fr';
+import { WhatsAppCardModal } from '../components/WhatsAppCardModal';
+import { departments, journalPage, site } from '../content/fr';
 import { editionLabel, groupEditions } from '../lib/articles';
 import { useDatabase, useRouteTitle } from '../lib/hooks';
 
@@ -13,6 +14,7 @@ export default function Journal() {
   const editions = useMemo(() => groupEditions(database.articles), [database.articles]);
   const [category, setCategory] = useState('');
   const [department, setDepartment] = useState('');
+  const [showWhatsAppCard, setShowWhatsAppCard] = useState(false);
 
   const allPublished = editions.flatMap((edition) => edition.articles);
   const categories = useMemo(() => {
@@ -39,6 +41,32 @@ export default function Journal() {
         intro={journalPage.intro}
         breadcrumb={[{ label: 'Accueil', href: '/' }, { label: 'Infos de la semaine au Congo' }]}
       >
+        <div className="page-header__actions">
+          {latest ? (
+            <>
+              <button
+                type="button"
+                className="button button--outline"
+                onClick={() => window.print()}
+              >
+                Imprimer La Une (format A4)
+                <span className="arrow" aria-hidden="true">
+                  ↓
+                </span>
+              </button>
+              <button
+                type="button"
+                className="button button--outline"
+                onClick={() => setShowWhatsAppCard(true)}
+              >
+                Carte de l’édition (1080 × 1350)
+                <span className="arrow" aria-hidden="true">
+                  ↓
+                </span>
+              </button>
+            </>
+          ) : null}
+        </div>
         <p className="journal-notice">{journalPage.notice}</p>
       </PageHeader>
 
@@ -186,8 +214,52 @@ export default function Journal() {
               </p>
             </div>
           </Container>
+
+          {/* Printable A4 Une layout for neighborhood posting */}
+          <div className="print-only a4-une">
+            <header className="a4-une__masthead">
+              <p className="a4-une__title">INFOS DE LA SEMAINE AU CONGO</p>
+              <p className="a4-une__subtitle">
+                U.N.I.O.N · {latest ? editionLabel(latest) : 'Édition spéciale'} · Format d’affichage public
+              </p>
+              <p className="a4-une__motto">« Un Congo uni travaille. Un Congo divisé mendie. »</p>
+            </header>
+
+            {latest?.featured ? (
+              <article className="a4-une__lead">
+                <h2>{latest.featured.title}</h2>
+                <p className="a4-une__standfirst">{latest.featured.standfirst}</p>
+              </article>
+            ) : null}
+
+            <div className="a4-une__grid">
+              {latest?.articles
+                .filter((a) => a.id !== latest.featured?.id)
+                .slice(0, 4)
+                .map((art) => (
+                  <article key={art.id} className="a4-une__item">
+                    <h3>{art.title}</h3>
+                    <p>{art.standfirst}</p>
+                  </article>
+                ))}
+            </div>
+
+            <footer className="a4-une__footer">
+              <p>Édition pour affichage de quartier et lecture collective · Mouvement U.N.I.O.N</p>
+            </footer>
+          </div>
         </Section>
       )}
+
+      {showWhatsAppCard ? (
+        <WhatsAppCardModal
+          title={latest ? editionLabel(latest) : journalPage.title}
+          standfirst={latest?.featured?.title || 'Édition hebdomadaire d’information au Congo.'}
+          category="Journal"
+          editionLabel={latest ? `Édition n°${latest.weekNumber}` : undefined}
+          onClose={() => setShowWhatsAppCard(false)}
+        />
+      ) : null}
     </>
   );
 }

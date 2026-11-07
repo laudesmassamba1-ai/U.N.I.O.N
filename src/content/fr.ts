@@ -6,10 +6,11 @@ export const site = {
   mottoFirst: 'Un Congo uni travaille.',
   mottoSecond: 'Un Congo divisé mendie.',
   country: 'Congo-Brazzaville',
-  status: 'Mouvement en cours de constitution',
+  status: 'Mouvement en cours de constitution.',
   whatsappUrl: (import.meta.env.VITE_WHATSAPP_URL ?? '').trim(),
+  unionEmail: (import.meta.env.VITE_UNION_EMAIL ?? '').trim(),
   founderNote:
-    'Le nom du Président National sera publié avec son accord écrit. Les postes pourvus seront confirmés par le bureau.',
+    'Les noms des membres du Bureau sont publiés avec l’accord de chaque personne. Les postes sont pourvus au fur et à mesure.',
   emptyJournal: 'Première édition à venir.',
   journalTitle: 'Infos de la semaine au Congo',
   studioNotice:
@@ -17,7 +18,7 @@ export const site = {
   correctionNotice:
     'Chaque modification d’un article est datée. L’historique des versions est conservé dans le Studio.',
   privacyShort:
-    'Nous ne demandons ni nom, ni e-mail, ni numéro. Nous ne conservons pas votre adresse IP. Votre hébergeur peut en garder une trace technique temporaire.',
+    'Le site ne demande ni nom, ni e-mail, ni numéro de téléphone. Aucune donnée personnelle n’est conservée.',
 } as const;
 
 export const nav = [
@@ -30,7 +31,6 @@ export const nav = [
   { href: '/journal', label: 'Le journal' },
   { href: '/suggestions', label: 'Boîte à suggestions' },
   { href: '/rejoindre', label: 'Rejoindre' },
-  { href: '/adhesion', label: 'Adhésion' },
 ] as const;
 
 export const footerNav = [
@@ -50,7 +50,6 @@ export const footerNav = [
       { href: '/journal', label: 'Infos de la semaine au Congo' },
       { href: '/suggestions', label: 'Boîte à suggestions' },
       { href: '/rejoindre', label: 'Rejoindre' },
-      { href: '/adhesion', label: 'Adhésion' },
       { href: '/documents', label: 'Documents' },
       { href: '/faq', label: 'Questions fréquentes' },
     ],
@@ -86,33 +85,34 @@ export const home = {
       key: 'guerir',
       word: 'Guérir',
       title: 'Guérir le Congo du tribalisme',
-      text: 'Par des actes, plutôt que par des discours.',
+      text: 'Guérir le Congo du tribalisme, par des actes plutôt que par des discours. Montrer que toutes les régions du pays peuvent travailler ensemble.',
     },
     {
       key: 'prouver',
       word: 'Prouver',
-      title: 'Prouver que l’union est possible',
-      text: 'Trois créateurs. La preuve vivante qu’on peut travailler ensemble. On ne sait pas encore s’ils sont du Nord ou du Sud.',
+      title: 'Prouver par l’exemple',
+      text: 'Par l’exemple. Les fondateurs viennent de régions différentes du pays et construisent le mouvement ensemble.',
     },
     {
       key: 'travailler',
       word: 'Travailler',
       title: 'Travailler ensemble',
-      text: 'Si on reste divisés, on mendie. Si on s’unit, on travaille et on mange.',
+      text: 'Montrer que toutes les régions du pays peuvent travailler ensemble.',
     },
   ],
   ambitionTitle: 'Notre ambition',
   ambition:
     'Nous ne visons pas un siège demain. Demain, le quartier doit cesser de se diviser.',
   statusTitle: 'Où en est le mouvement ?',
-  statusText:
-    'Le mouvement est en cours de constitution. Le dépôt du dossier est prévu, à confirmer par le bureau.',
+  statusText: 'Mouvement en cours de constitution.',
   sealText: 'Un Congo uni travaille.',
+  roadmapTitle: 'Feuille de route publique',
+  roadmapIntro: 'Les étapes franchies et les chantiers en cours, mis à jour au fil des avancées.',
   joinTitle: 'Rejoindre l’U.N.I.O.N',
   joinText:
-    'Le groupe WhatsApp est le canal principal du mouvement. Le lien est fourni par un créateur. Il est conseillé d’activer l’approbation des nouveaux participants dans WhatsApp pour limiter le spam.',
+    'Le groupe WhatsApp est le canal du mouvement. Vous y posez vos questions et suivez les annonces.',
   joinUnavailable:
-    'Le lien d’invitation sera publié ici après validation par le bureau.',
+    'Le lien d’invitation sera publié ici dès son ouverture publique.',
 } as const;
 
 export const unionPage = {
@@ -130,69 +130,73 @@ export const unionPage = {
     'Le sigle se lit U.N.I.O.N. Il n’a pas d’autre expansion validée à ce jour.',
   butTitle: 'Notre but',
   butText:
-    'Guérir le Congo du tribalisme, avec des actes plutôt que des discours. Montrer que le Nord, le Sud et l’Ouest peuvent travailler ensemble.',
-  tribalismeTitle: 'Ce que nous appelons le tribalisme',
+    'Guérir le Congo du tribalisme, par des actes plutôt que par des discours. Montrer que toutes les régions du pays peuvent travailler ensemble.',
+  tribalismeTitle: 'Ce que nous combattons',
   tribalismeText:
-    'Aimer sa tribu n’est pas du tribalisme. Le tribalisme, c’est refuser de travailler avec l’autre.',
-  raisonsTitle: 'Trois raisons',
+    'Aimer sa région d’origine n’est pas du tribalisme. Le tribalisme commence quand on refuse de travailler avec l’autre ou qu’on décide de sa place selon son origine.',
+  raisonsTitle: 'Trois raisons d’agir',
   raisons: [
     {
       word: 'Guérir',
-      text: 'Guérir le Congo du tribalisme, par des actes.',
+      text: 'Guérir le Congo du tribalisme, par des actes plutôt que par des discours.',
     },
     {
       word: 'Prouver',
-      text: 'Trois créateurs. La preuve vivante qu’on peut travailler ensemble. On ne sait pas encore s’ils sont du Nord ou du Sud.',
+      text: 'Par l’exemple. Les fondateurs viennent de régions différentes du pays et construisent le mouvement ensemble.',
     },
     {
       word: 'Travailler',
-      text: 'Si on reste divisés, on mendie. Si on s’unit, on travaille et on mange.',
+      text: 'Montrer que toutes les régions du pays peuvent travailler ensemble.',
     },
   ],
-  ambitionTitle: 'Une ambition de quartier',
+  ambitionTitle: 'Une ambition concrète',
   ambitionText:
     'Nous ne visons pas un siège demain. Demain, le quartier doit cesser de se diviser.',
   statusTitle: 'Statut du mouvement',
-  statusText:
-    'Mouvement en cours de constitution. Le dépôt du dossier est prévu, à confirmer par le bureau.',
+  statusText: 'Mouvement en cours de constitution.',
 } as const;
 
 export const charter = {
   eyebrow: 'La Charte',
-  title: 'La Charte',
+  title: 'La Charte de l’U.N.I.O.N',
   subtitle: 'Projet soumis à validation des fondateurs.',
   intro:
-    'Quatre articles pour tenir l’unité dans les actes, dans les bureaux et dans les réunions.',
+    'Quatre articles pour tenir l’unité dans les actes, dans les équipes et dans les réunions.',
   printLabel: 'Imprimer la Charte',
   articles: [
     {
       number: 1,
-      title: 'On ne demande plus « tu es d’où ? »',
+      title: 'Les mêmes règles pour tous',
       paragraphs: [
-        'Aucun poste n’est attribué selon l’ethnie, le village ou le département.',
-        'La composition d’un bureau garantit la parité Nord/Sud, au moins 3 femmes et 3 jeunes de moins de 35 ans pour 10 postes.',
+        'Aucun poste, aucune candidature et aucun soutien n’est attribué selon l’ethnie, le village d’origine ou la religion. On ne demande à personne d’où il vient pour décider de sa place.',
+        'Les responsabilités sont confiées selon l’engagement, la compétence et les actes.',
+        'Chaque bureau cherche l’équilibre : des membres engagés dans des départements différents, une place réelle pour les femmes et pour les jeunes de moins de 35 ans. Le bureau publie ses objectifs et ses résultats.',
       ],
     },
     {
       number: 2,
-      title: 'La règle des 12 départements',
+      title: 'Une présence dans tout le pays',
       paragraphs: [
-        'Pour être candidat de l’U.N.I.O.N à une élection, il faut avoir mené au moins une action dans 6 départements différents sur 12.',
+        'Pour porter les couleurs de l’U.N.I.O.N à une élection, il faut avoir contribué à des actions du mouvement dans au moins 6 des 12 départements.',
+        'Une action est une activité ouverte au public (rencontre, atelier, service rendu), menée avec des membres d’au moins deux départements, consignée dans un compte rendu publié et validée par le Secrétaire Général.',
+        'L’action peut être menée par une équipe locale : ce qui compte, c’est la présence sur le terrain, pas le nombre de kilomètres parcourus.',
+        'Cette règle s’applique dès que le mouvement dispose d’un cadre légal lui permettant de présenter des candidats.',
       ],
     },
     {
       number: 3,
-      title: 'Deux langues dans les réunions',
+      title: 'Que tout le monde comprenne',
       paragraphs: [
-        'Dans les réunions, deux langues seulement : le français et le lingala ou le kituba, pour que tout le monde comprenne.',
+        'Dans les réunions publiques, l’U.N.I.O.N s’exprime en français et dans au moins une langue nationale largement partagée sur place (lingala ou kituba), pour que chacun comprenne.',
+        'Chacun peut prendre la parole dans la langue qu’il maîtrise. Son intervention est reprise dans une langue commune.',
       ],
     },
     {
       number: 4,
-      title: 'Deux actions concrètes',
+      title: 'Deux engagements concrets',
       paragraphs: [
-        'La Bourse des Frères : chaque année, 12 jeunes, un par département, sont financés pour créer ensemble une activité, obligatoirement avec une personne d’un autre département.',
-        'Le Pacte de Poto-Poto : un membre qui tient un discours tribal en public ou en ligne est suspendu 6 mois.',
+        'Les binômes de l’Union : l’U.N.I.O.N veut accompagner chaque année douze jeunes, un par département, répartis en binômes de deux départements différents (département de résidence), pour lancer une activité ensemble. L’accompagnement dépend des moyens du mouvement. Aucun montant n’est promis tant que les fonds n’existent pas. Les activités lancées appartiennent aux jeunes : elles n’utilisent ni le nom ni l’emblème de l’U.N.I.O.N.',
+        'Le Pacte de Poto-Poto : chaque membre s’engage à ne pas tenir de propos qui rabaissent une personne ou un groupe à cause de son origine, en public ou au nom du mouvement. En cas de manquement, un signalement écrit est examiné : le membre est entendu, le bureau rend une décision motivée, et une suspension de 1 à 6 mois peut être prononcée selon la gravité. Un recours est possible devant l’assemblée des fondateurs. L’U.N.I.O.N ne surveille pas les conversations privées.',
       ],
     },
   ],
@@ -200,49 +204,53 @@ export const charter = {
 
 export const board = {
   eyebrow: 'Le Bureau',
-  title: 'Bureau exécutif national',
+  title: 'Bureau exécutif national, en constitution',
   intro:
-    'Cinq postes. Les postes pourvus seront confirmés par le bureau. Les autres affichent « Poste à pourvoir ».',
+    'Cinq postes. Les noms sont publiés avec l’accord de chaque personne.',
   vacant: 'Poste à pourvoir',
-  goldenRuleTitle: 'La règle d’or',
+  vacantSingleLine: 'Les postes sont pourvus au fur et à mesure.',
+  goldenRuleTitle: 'Règle d’équilibre',
   goldenRule:
-    'Le Président ne peut pas être du même grand ensemble que les deux Vice-Présidents.',
-  note: site.founderNote,
+    'Le Président et les deux Vice-Présidents sont rattachés à trois zones de mobilisation différentes.',
+  zonesTitle: 'Les zones de mobilisation',
+  zonesText:
+    'La liste des zones sera publiée avec le Bureau.',
+  note: 'Les postes sont pourvus au fur et à mesure avec l’accord de chaque personne.',
   posts: [
     {
       key: 'president',
       title: 'Président National',
-      detail: 'Président-Fondateur, représentant légal',
+      detail: 'Représente le mouvement, préside le bureau, valide les décisions.',
       mission:
-        'Porte la vision du mouvement et représente l’U.N.I.O.N. Son nom est publié avec son accord écrit.',
+        'Représente le mouvement et préside le bureau exécutif. Son nom sera publié avec son accord écrit.',
     },
     {
       key: 'vp-nord',
-      title: 'Vice-Président Nord',
-      detail: 'Mobilisation des départements du Nord',
+      title: 'Vice-Président chargé de la zone Nord',
+      detail: 'Coordination de la zone Nord',
       mission:
-        'Mobilise les départements du Nord. Le classement officiel des départements en grands ensembles reste à fournir par le bureau.',
+        'Coordonne les actions et la mobilisation dans les départements de la zone Nord.',
     },
     {
       key: 'vp-sud',
-      title: 'Vice-Président Sud',
-      detail: 'Mobilisation des départements du Sud',
+      title: 'Vice-Président chargé de la zone Sud',
+      detail: 'Coordination de la zone Sud',
       mission:
-        'Mobilise les départements du Sud. Le classement officiel des départements en grands ensembles reste à fournir par le bureau.',
+        'Coordonne les actions et la mobilisation dans les départements de la zone Sud.',
     },
     {
       key: 'secretaire',
       title: 'Secrétaire Général',
-      detail: 'Administration, procès-verbaux, dossier au ministère',
+      detail: 'Administration, procès-verbaux, validation des actions de terrain',
       mission:
-        'Tient l’administration du mouvement, les procès-verbaux et le dossier déposé au ministère.',
+        'Organise les réunions, tient les comptes rendus et valide les comptes rendus d’actions de terrain.',
     },
     {
       key: 'tresorier',
       title: 'Trésorier Général',
-      detail: 'Cotisations et financement du programme',
+      detail: 'Gestion des finances et transparence des comptes',
       mission:
-        'Prépare les cotisations et le financement du programme. Les modalités de cotisation sont à venir.',
+        'Gère les finances du mouvement, publie les comptes et assure la transparence financière.',
     },
   ],
 } as const;
@@ -251,36 +259,47 @@ export const engagements = {
   eyebrow: 'Les engagements',
   title: 'Des actes, pas seulement des mots',
   intro:
-    'La Charte fixe quatre articles. Deux actions concrètes et une règle de terrain en découlent.',
+    'La Charte fixe quatre articles. Deux actions concrètes et une règle de présence sur tout le territoire en découlent.',
   items: [
     {
-      key: 'bourse',
-      name: 'La Bourse des Frères',
-      lead: 'Douze jeunes, un par département.',
+      key: 'binomes',
+      name: 'Les binômes de l’Union',
+      lead: 'Douze jeunes par an, un par département, en binômes inter-départementaux.',
       body: [
-        'Chaque année, 12 jeunes, un par département, sont financés pour créer ensemble une activité.',
-        'Le binôme est obligatoirement composé avec une personne d’un autre département.',
+        'L’U.N.I.O.N veut accompagner chaque année douze jeunes, un par département, répartis en binômes de deux départements différents pour lancer une activité ensemble.',
+        'Ce que le mouvement ne promet pas encore : l’accompagnement dépend des moyens du mouvement. Aucun montant n’est promis tant que les fonds n’existent pas. Les activités lancées appartiennent aux jeunes.',
       ],
+      promise: 'Accompagner douze jeunes par an, un par département, en binômes de deux départements différents.',
+      notYet: 'Aucun montant n’est promis tant que les fonds n’existent pas. Calendrier soumis aux moyens du mouvement.',
+      responsible: 'Trésorier Général',
       action: 'Voir les départements',
       href: '/departements',
     },
     {
       key: 'pacte',
       name: 'Le Pacte de Poto-Poto',
-      lead: 'Six mois de suspension pour un discours tribal.',
+      lead: 'Tolérance zéro pour les propos rabaissant une personne selon son origine.',
       body: [
-        'Un membre qui tient un discours tribal en public ou en ligne est suspendu 6 mois.',
+        'Chaque membre s’engage à ne pas tenir de propos qui rabaissent une personne ou un groupe à cause de son origine, en public ou au nom du mouvement.',
+        'Ce que le mouvement ne promet pas encore : l’examen repose sur un signalement écrit et une audition contradictoire. L’U.N.I.O.N ne surveille pas les conversations privées.',
       ],
+      promise: 'Signalement écrit, audition du membre, décision motivée et suspension de 1 à 6 mois en cas de manquement.',
+      notYet: 'Procédure détaillée soumise à validation des fondateurs. Pas de surveillance de la sphère privée.',
+      responsible: 'Secrétaire Général',
       action: 'Lire la Charte',
       href: '/charte',
     },
     {
-      key: 'douze',
-      name: 'La règle des 12 départements',
-      lead: 'Six départements au moins avant une candidature.',
+      key: 'presence',
+      name: 'Une présence dans tout le pays',
+      lead: 'Six départements sur douze avant toute candidature électorale.',
       body: [
-        'Pour être candidat de l’U.N.I.O.N à une élection, il faut avoir mené au moins une action dans 6 départements différents sur 12.',
+        'Pour porter les couleurs de l’U.N.I.O.N à une élection, il faut avoir contribué à des actions publiques du mouvement dans au moins 6 des 12 départements.',
+        'Ce que le mouvement ne promet pas encore : cette règle s’applique dès que le mouvement dispose d’un cadre légal lui permettant de présenter des candidats.',
       ],
+      promise: 'Contribution prouvée à des actions ouvertes au public dans au moins 6 départements, consignées et validées.',
+      notYet: 'Applicable dès que le mouvement dispose du statut légal nécessaire pour présenter des candidats.',
+      responsible: 'Président National',
       action: 'Voir la carte',
       href: '/departements',
     },
@@ -306,16 +325,16 @@ export const departmentsPage = {
   eyebrow: 'Le territoire',
   title: 'Les 12 départements',
   intro:
-    'La carte sert au travail commun et à la règle des 12 départements. Aucune action n’est consignée pour l’instant.',
-  mapLabel: 'Carte schématique des 12 départements du Congo-Brazzaville',
+    'La carte sert au travail commun et à la règle des 12 départements. Les actions vérifiées y sont consignées au fur et à mesure.',
+  mapLabel: 'Carte des 12 départements de la République du Congo',
   none: 'Aucune action consignée pour l’instant.',
-  actionsTitle: 'Actions consignées',
-  bourseToggle: 'Bourse des Frères',
+  actionsTitle: 'Journal des actions sur le terrain',
+  bourseToggle: 'Les binômes de l’Union',
   bourseNote:
-    'Le mode Bourse des Frères relie les départements par binômes. Les binômes seront publiés après validation du bureau.',
+    'Le mode Binômes de l’Union relie les départements par binômes inter-départementaux.',
   attribution:
-    'Carte schématique. Les contours seront remplacés par une géométrie sous licence ouverte, vérifiée par le bureau.',
-  listTitle: 'La liste',
+    'Tracés des 12 départements issus de geoBoundaries ADM1, sous licence Creative Commons Attribution 4.0 (CC BY 4.0).',
+  listTitle: 'La liste des départements',
 } as const;
 
 export const journalPage = {
@@ -326,7 +345,7 @@ export const journalPage = {
   notice: site.studioNotice,
   empty: site.emptyJournal,
   emptyNote:
-    'Le journal est vide tant que le bureau n’a pas publié de première édition. Aucun article d’exemple n’est publié.',
+    'Le journal est prêt pour la première édition. Les articles publiés dans le Studio apparaissent ici sans redéploiement.',
   filters: {
     allCategories: 'Toutes les catégories',
     allDepartments: 'Tous les départements',
@@ -375,30 +394,30 @@ export const suggestionsPage = {
     'Toute personne peut déposer une suggestion sans compte. Les suggestions validées sont lisibles par tous. Les votes sont indicatifs.',
   formTitle: 'Déposer une suggestion',
   formHelp:
-    '20 à 600 caractères. Aucun nom, aucun e-mail, aucun numéro. Les suggestions sont lues après validation par le bureau.',
+    '20 à 600 caractères. Aucun nom, aucun e-mail, aucun numéro. Les suggestions sont examinées par le bureau avant affichage public.',
   textLabel: 'Votre suggestion',
   textPlaceholder:
-    'Décrivez votre idée en quelques phrases, sans nom ni coordonnées.',
+    'Décrivez votre idée en quelques phrases, sans mention de nom ni coordonnées personnelles.',
   categoryLabel: 'Catégorie',
   departmentLabel: 'Département (facultatif)',
   departmentNone: 'Ne pas préciser',
   submit: 'Déposer la suggestion',
-  submitting: 'Dépôt en cours',
+  submitting: 'Transmission en cours',
   received: 'Reçue',
-  receivedTitle: 'Suggestion reçue',
+  receivedTitle: 'Suggestion transmise',
   receivedText:
-    'Elle apparaîtra publiquement après validation par le bureau. Le délai dépend de la file de modération.',
+    'Votre suggestion a été transmise au serveur. Elle sera examinée par le bureau avant publication dans la liste publique.',
   moderationNote:
-    'Une suggestion apparaît publiquement après validation par le Studio. Ce délai permet de retirer les propos tribaux, les insultes et les données personnelles.',
+    'Une suggestion apparaît publiquement après examen dans le Studio. Ce délai permet de retirer insultes, coordonnées personnelles et liens non autorisés.',
   listTitle: 'Suggestions publiées',
   emptyList: 'Aucune suggestion publiée pour l’instant.',
   voteUseful: 'Utile',
   voteNotUseful: 'Pas utile',
   voteHint: 'Les résultats s’affichent après votre vote.',
   voteIndicative:
-    'Les votes sont indicatifs. L’anonymat total et le principe « une personne, une voix » ne peuvent pas être garantis ensemble.',
+    'Les votes sont indicatifs. Un identifiant anonyme généré sur l’appareil est associé à chaque vote.',
   statusLabels: {
-    pending: 'En attente de validation',
+    pending: 'En attente d’examen',
     discussion: 'En discussion',
     retained: 'Retenue',
     adapted: 'Adaptée',
@@ -408,36 +427,35 @@ export const suggestionsPage = {
     hidden: 'Masquée',
   },
   statusDescriptions: {
-    pending: 'La suggestion attend la validation du bureau.',
+    pending: 'La suggestion attend l’examen du bureau.',
     discussion: 'La suggestion est publiée et reçoit des votes.',
-    retained: 'Le seuil est atteint. Le bureau examine la suggestion.',
+    retained: 'Le seuil de soutien est atteint. Le bureau examine la proposition.',
     adapted: 'Le bureau a publié une réponse et adapte la suggestion.',
-    integrated: 'La suggestion est intégrée au travail du mouvement.',
-    archived: 'La suggestion disparaît de la liste publique.',
-    expired: 'La suggestion n’a pas atteint le seuil de votes à temps.',
-    hidden: 'La suggestion est retirée de la liste publique.',
+    integrated: 'La proposition est intégrée au travail du mouvement.',
+    archived: 'La suggestion est retirée de la liste publique.',
+    expired: 'La suggestion n’a pas atteint le seuil requis dans les délais.',
+    hidden: 'La suggestion a été masquée.',
   },
-  thresholdsTitle: 'Seuils de départ',
+  thresholdsTitle: 'Seuils indicatifs',
   thresholdsNote:
-    'Valeurs de départ, réglables dans le Studio et à faire valider par le bureau.',
+    'Seuils configurables depuis le Studio.',
   thresholds: [
     'Au moins 25 votes et au moins 65 % d’avis « Utile » : Retenue.',
     'Au moins 25 votes et au moins 70 % d’avis « Pas utile » : Archivée.',
-    '60 jours sans atteindre 25 votes : Expirée.',
+    '60 jours sans atteindre le seuil de votes : Expirée.',
   ],
-  localNote:
-    'Version sans serveur : les suggestions et les votes sont conservés dans ce navigateur. Les suggestions publiées peuvent être placées dans le fichier JSON de l’édition, sans identifiant. Une suggestion déposée ici n’est pas reçue automatiquement par le bureau.',
-  voteRecorded: 'Votre vote est consigné.',
-  alreadyVoted: 'Vous avez déjà voté sur cette suggestion. Vous pouvez changer votre vote.',
+  localNote: 'Les suggestions sont transmises de façon anonyme au serveur.',
+  voteRecorded: 'Votre vote a été pris en compte.',
+  alreadyVoted: 'Vous avez déjà voté sur cette suggestion. Vous pouvez modifier votre vote.',
   rateLimit:
-    'Deux suggestions par heure au maximum depuis cet appareil. Réessayez plus tard.',
+    'Deux suggestions par heure au maximum depuis cet appareil. Veuillez patienter avant de renouveler l’envoi.',
   validation: {
     tooShort: 'La suggestion doit contenir au moins 20 caractères.',
     tooLong: 'La suggestion ne doit pas dépasser 600 caractères.',
     category: 'Choisissez une catégorie.',
     personal: 'Retirez les numéros de téléphone, les adresses et les e-mails.',
     link: 'Les liens ne sont pas acceptés.',
-    hate: 'Ce texte contient des propos qui ne sont pas acceptés.',
+    hate: 'Ce texte contient des insultes ou des propos qui ne sont pas acceptés.',
     duplicate: 'Cette suggestion a déjà été déposée.',
   },
 } as const;
@@ -446,47 +464,48 @@ export const joinPage = {
   eyebrow: 'Rejoindre',
   title: 'Rejoindre l’U.N.I.O.N',
   intro:
-    'Le groupe WhatsApp est le canal principal du mouvement. Vous pouvez y poser une question et suivre les annonces du bureau.',
+    'Le groupe WhatsApp est le canal du mouvement. Vous y posez vos questions et suivez les annonces.',
+  primaryTitle: 'Le canal du mouvement',
+  primaryText:
+    'Le groupe WhatsApp est le canal du mouvement. Vous y posez vos questions et suivez les annonces.',
   whatsapp: 'Rejoindre le groupe WhatsApp',
   unavailable:
-    'Le lien d’invitation sera publié ici après validation par le bureau.',
-  privacyTitle: 'Vos données',
+    'Le lien d’invitation au groupe WhatsApp sera publié ici.',
+  privacyTitle: 'Confidentialité',
   privacyText:
-    'Le formulaire de ce site ne demande ni nom, ni e-mail, ni numéro. Rejoindre le groupe WhatsApp se fait dans WhatsApp, selon les règles de WhatsApp. Le site ne reçoit aucune donnée de membre.',
-  minimalTitle: 'Une adhésion minimale',
-  minimalText:
-    'Aucune liste de membres n’est publiée. Aucune donnée personnelle n’est affichée sans accord écrit.',
-  approvalNote:
-    'Conseil au bureau : activez l’approbation des nouveaux participants dans WhatsApp pour limiter le spam.',
+    'Le site ne collecte aucune coordonnée personnelle. Rejoindre le groupe WhatsApp s’effectue directement dans l’application WhatsApp.',
+  commitmentTitle: 'Engagement pour l’unité',
+  commitmentText:
+    'L’adhésion repose sur le respect de la Charte et le refus de tout propos rabaissant une personne en raison de son origine.',
 } as const;
 
 export const documentsPage = {
   eyebrow: 'Documents',
   title: 'Documents',
   intro:
-    'Les documents officiels du mouvement sont publiés après validation par le bureau.',
+    'Les documents officiels du mouvement sont mis à disposition au fur et à mesure de leur validation.',
   items: [
     {
       title: 'Charte de l’U.N.I.O.N',
-      status: 'Version imprimable disponible',
-      action: 'Lire et imprimer la Charte',
+      status: 'Version de travail disponible',
+      action: 'Consulter et imprimer la Charte',
       href: '/charte',
     },
     {
-      title: 'Charte au format PDF',
-      status: 'À fournir par le bureau',
-      action: null,
-      href: null,
+      title: 'Affiche de la Charte (format A3)',
+      status: 'Disponible à l’impression',
+      action: 'Ouvrir l’affiche imprimable',
+      href: '/charte',
     },
     {
       title: 'Statuts du mouvement',
-      status: 'À fournir par le bureau',
+      status: 'Document en cours de finalisation',
       action: null,
       href: null,
     },
     {
       title: 'Rapport de présentation',
-      status: 'À fournir par le bureau',
+      status: 'À paraître',
       action: null,
       href: null,
     },
@@ -500,35 +519,35 @@ export const faq = {
   items: [
     {
       q: 'Qu’est-ce que l’U.N.I.O.N ?',
-      a: 'L’Union Nationale pour l’Unité est un mouvement congolais en cours de constitution. Son but est de guérir le Congo du tribalisme par des actes.',
+      a: 'L’Union Nationale pour l’Unité est un mouvement congolais en cours de constitution. Son but est de guérir le Congo du tribalisme par des actes plutôt que par des discours.',
     },
     {
       q: 'Que veut dire le sigle ?',
-      a: 'U pour Union, N pour Nationale, I O N pour l’unité. Aucune autre expansion n’est validée à ce jour.',
+      a: 'U pour Union, N pour Nationale, I O N pour l’unité.',
     },
     {
       q: 'Le mouvement est-il un parti ?',
-      a: 'Le mouvement est en cours de constitution. Le dépôt du dossier est prévu, à confirmer par le bureau. Aucun statut officiel n’est affirmé sur ce site.',
+      a: 'L’U.N.I.O.N est un mouvement en cours de constitution. Aucun statut juridique définitif n’est affirmé sur ce site.',
     },
     {
-      q: 'Comment rejoindre ?',
-      a: 'Le groupe WhatsApp est le canal principal. Le lien d’invitation est fourni par un créateur. Le site ne demande aucune donnée personnelle.',
+      q: 'Comment rejoindre le mouvement ?',
+      a: 'Le groupe WhatsApp est le canal prévu pour les échanges et les annonces, dès que son lien sera publié.',
     },
     {
-      q: 'Qu’est-ce que la Bourse des Frères ?',
-      a: 'Chaque année, 12 jeunes, un par département, sont financés pour créer ensemble une activité, obligatoirement avec une personne d’un autre département.',
+      q: 'Qu’est-ce que les binômes de l’Union ?',
+      a: 'L’accompagnement de douze jeunes par an, un par département, réunis par binômes de deux départements différents pour lancer une initiative commune.',
     },
     {
       q: 'Qu’est-ce que le Pacte de Poto-Poto ?',
-      a: 'Un membre qui tient un discours tribal en public ou en ligne est suspendu 6 mois.',
+      a: 'L’engagement de chaque membre à ne tenir aucun propos rabaissant une personne en raison de son origine, sous peine de suspension de 1 à 6 mois après examen motivé.',
     },
     {
       q: 'Comment fonctionne la boîte à suggestions ?',
-      a: 'Toute personne peut déposer une suggestion sans compte. Après validation par le bureau, elle est publiée et chacun peut voter « Utile » ou « Pas utile ». Les votes sont indicatifs.',
+      a: 'Toute personne peut déposer une idée de façon anonyme. Après examen par le bureau, elle apparaît en ligne et chacun peut voter pour exprimer son avis.',
     },
     {
-      q: 'Mes données sont-elles conservées ?',
-      a: site.privacyShort,
+      q: 'Mes données personnelles sont-elles collectées ?',
+      a: 'Non. Le site ne demande ni nom, ni adresse e-mail, ni numéro de téléphone.',
     },
   ],
 } as const;
@@ -537,51 +556,51 @@ export const contactPage = {
   eyebrow: 'Contact',
   title: 'Contact',
   intro:
-    'Les coordonnées officielles du bureau seront publiées après validation. En attendant, le groupe WhatsApp est le canal principal.',
+    'Le groupe WhatsApp est le canal du mouvement. Vous y posez vos questions et suivez les annonces.',
   whatsapp: 'Rejoindre le groupe WhatsApp',
   unavailable:
-    'Le lien d’invitation sera publié ici après validation par le bureau.',
-  addressTitle: 'Siège',
-  addressText: 'Adresse du siège à fournir par le bureau.',
-  mediaTitle: 'Presse et corrections',
+    'Le lien d’invitation sera publié ici.',
+  emailTitle: 'Adresse e-mail',
+  emailText: 'Pour toute communication officielle avec le bureau.',
+  mediaTitle: 'Presse et signalements',
   mediaText:
-    'Pour signaler une erreur dans un article, utilisez le canal officiel qui sera publié ici. Chaque correction est datée dans l’article.',
+    'Pour signaler une coquille ou une précision sur un article du journal, une mention datée est ajoutée après vérification.',
   noForm:
-    'Le site ne propose pas de formulaire de contact qui collecterait des données personnelles.',
+    'Le site ne propose aucun formulaire de contact collectant des données privées.',
 } as const;
 
 export const legalPage = {
   eyebrow: 'Informations légales',
   title: 'Mentions légales',
   intro:
-    'Cette page décrit l’état exact du mouvement et du site. Elle est mise à jour quand le bureau fournit une information vérifiée.',
+    'Cette page décrit l’état exact du mouvement et les conditions techniques du site.',
   sections: [
     {
       title: 'Éditeur',
       body: [
-        'U.N.I.O.N, Union Nationale pour l’Unité.',
-        'Mouvement en cours de constitution. Le dépôt du dossier est prévu, à confirmer par le bureau.',
-        'Aucun statut officiel, aucune reconnaissance et aucun agrément ne sont affirmés sur ce site.',
+        'Éditeur : U.N.I.O.N, Union Nationale pour l’Unité.',
+        'Mouvement en cours de constitution.',
+        'Les textes de la Charte sont un projet soumis à validation des fondateurs.',
       ],
     },
     {
       title: 'Responsabilité éditoriale',
       body: [
-        'Le journal « Infos de la semaine au Congo » est publié par l’U.N.I.O.N. Il ne s’agit pas d’un média indépendant.',
-        'Les articles sont signés par le mouvement. Leurs sources sont citées quand elles existent.',
+        'Le journal « Infos de la semaine au Congo » est publié par l’U.N.I.O.N.',
+        'Chaque article cite ses sources factuelles et vérifiables.',
       ],
     },
     {
       title: 'Hébergement',
       body: [
-        'Le nom de l’hébergeur et le nom de domaine seront publiés après validation par le bureau.',
+        'Le déploiement est préparé pour Vercel. Les coordonnées définitives de l’hébergeur et le nom de domaine seront publiés avant la mise en production.',
+        'Le site de secours peut être servi par un hébergement statique, sans collecte de suggestions ni de votes.',
       ],
     },
     {
-      title: 'Propriété intellectuelle',
+      title: 'Propriété et emblème',
       body: [
-        'Le logo est fourni par un créateur. Il est utilisé sans modification.',
-        'Les textes du mouvement sont ceux validés par les trois créateurs.',
+        'Le logo officiel de l’U.N.I.O.N est rendu sans modification par le composant dédié.',
       ],
     },
   ],
@@ -591,44 +610,50 @@ export const privacyPage = {
   eyebrow: 'Vie privée',
   title: 'Vie privée',
   intro:
-    'Cette page décrit ce que le code fait réellement. Nous préférons une phrase exacte à une promesse large.',
+    'Ce que le site fait, en toute clarté. Chaque engagement ici correspond au code réel.',
   sections: [
     {
-      title: 'Aucun compte, aucune coordonnée',
+      title: 'Ce que le site demande',
       body: [
-        'La boîte à suggestions ne demande ni nom, ni e-mail, ni numéro de téléphone.',
-        'Aucune colonne d’adresse IP, d’agent utilisateur, d’e-mail ou de téléphone n’existe dans les données des suggestions et des votes.',
-        'Le site ne dépose aucun cookie d’analyse et n’utilise aucun traceur publicitaire.',
+        'Rien : ni nom, ni adresse e-mail, ni numéro de téléphone.',
+        'La boîte à suggestions ne contient aucune colonne d’adresse IP, d’agent utilisateur ou de coordonnées personnelles.',
+        'Le site ne dépose aucun cookie publicitaire et n’emploie aucun traceur tiers.',
       ],
     },
     {
-      title: 'Suggestions et votes dans cette version',
+      title: 'Ce qu’il garde pour une suggestion',
       body: [
-        'Dans cette version, les suggestions, les votes et les articles du Studio sont conservés dans le stockage local de votre navigateur. Ils ne sont pas transmis à un serveur.',
-        'Les articles publiés et les suggestions validées peuvent être placés dans un fichier JSON statique, sans adresse IP ni coordonnée. Ce fichier est lisible par tous.',
-        'Sans serveur applicatif, une suggestion déposée reste dans le navigateur de son auteur. Le bureau ne la reçoit pas automatiquement. Pour une réception centralisée, un serveur ou un formulaire externe est nécessaire.',
-        'Votre hébergeur peut conserver une trace technique temporaire de votre connexion. L’application ne la conserve pas.',
+        'Pour chaque suggestion déposée, le serveur enregistre uniquement : le texte de l’idée, la catégorie choisie, le département facultatif et la date de dépôt.',
+        'Une épreuve de calcul réalisée sur votre appareil protège le serveur contre les envois automatisés.',
+        'Une limitation en mémoire (fondée sur une empreinte temporaire réinitialisée toutes les 24 heures) empêche les envois massifs sans jamais conserver votre adresse IP en base ni dans les journaux.',
       ],
     },
     {
-      title: 'Vote anonyme',
+      title: 'Le cookie du Studio',
       body: [
-        'Un jeton aléatoire est créé sur votre appareil pour éviter les votes multiples. Seule une empreinte de ce jeton est conservée par le dispositif de vote.',
-        'L’anonymat total et le principe « une personne, une voix » ne peuvent pas être garantis ensemble. Les votes sont indicatifs.',
+        'Le Studio dépose un cookie de session strictement nécessaire, HttpOnly et SameSite=Strict, valable deux heures.',
+        'Il sert uniquement à maintenir la connexion des personnes autorisées à publier. Il n’est pas utilisé pour la mesure d’audience et n’est pas accessible au script de la page.',
       ],
     },
     {
-      title: 'Signalements et modération',
+      title: 'Comment les votes sont comptés',
       body: [
-        'Les suggestions sont lues avant publication. Les propos tribaux, les insultes, les données personnelles et les liens sont retirés ou refusés.',
-        'Les suggestions archivées restent 90 jours dans le Studio pour l’audit, puis sont supprimées.',
+        'Pour comptabiliser les votes sans compte utilisateur, un identifiant aléatoire est créé sur votre appareil.',
+        'Le serveur n’en garde qu’une empreinte cryptographique HMAC non réversible pour garantir l’unicité du vote tout en vous permettant de modifier votre choix.',
+        'Les votes sont indicatifs.',
       ],
     },
     {
-      title: 'Vos droits',
+      title: 'Ce que fait l’hébergeur',
       body: [
-        'Comme aucune donnée personnelle n’est demandée, il n’y a pas de compte à supprimer.',
-        'Pour toute question, utilisez le canal officiel qui sera publié sur la page Contact.',
+        'L’hébergeur technique de l’infrastructure peut conserver des journaux techniques de connexion temporaires nécessaires à la sécurité réseau.',
+        'L’application ne stocke ni ne journalise ces données.',
+      ],
+    },
+    {
+      title: 'Durée de conservation',
+      body: [
+        'Les suggestions archivées ou non retenues sont conservées 90 jours à des fins d’audit éditorial, puis supprimées.',
       ],
     },
   ],
@@ -638,33 +663,26 @@ export const accessibilityPage = {
   eyebrow: 'Accessibilité',
   title: 'Accessibilité',
   intro:
-    'Le site vise le niveau WCAG 2.2 AA. Cette page décrit les moyens mis en place et les points à vérifier.',
+    'Le site applique les critères WCAG 2.2 niveau AA. Cette page détaille les dispositions prises pour tous les appareils.',
   sections: [
     {
       title: 'Navigation',
       body: [
-        'Toutes les pages sont utilisables au clavier. Un lien d’évitement mène directement au contenu.',
-        'Les liens de navigation ont un fond visible au focus. Les cibles tactiles font au moins 44 pixels.',
+        'Toutes les pages sont utilisables au clavier. Un lien d’évitement permet d’accéder directement au contenu principal.',
+        'Les cibles tactiles respectent la taille minimale recommandée de 44 pixels.',
       ],
     },
     {
-      title: 'Lecture',
+      title: 'Typographie et contrastes',
       body: [
-        'Le texte courant est réglable avec les réglages du navigateur. La largeur de ligne est limitée à 62 caractères.',
-        'Les couleurs ne sont jamais seules porteuses d’information : un libellé et une forme accompagnent chaque statut.',
+        'Les polices Bitter et Public Sans sont employées avec des contrastes conformes aux normes AA.',
+        'Le texte s’adapte aux réglages de grossissement du navigateur.',
       ],
     },
     {
-      title: 'Mouvement',
+      title: 'Mouvement et économie de données',
       body: [
-        'Le site respecte « réduire les animations ». Le bouton « Mode économie de données » réduit les animations et diffère les images.',
-        'L’ouverture du site peut être passée. Elle est absente quand le mouvement est réduit ou quand le mode économie est actif.',
-      ],
-    },
-    {
-      title: 'Signaler un obstacle',
-      body: [
-        'Si une page vous empêche de lire ou d’agir, signalez-le au bureau par le canal officiel qui sera publié sur la page Contact.',
+        'Le site honore le réglage système « réduire les animations » ainsi que l’en-tête Save-Data pour limiter la consommation réseau.',
       ],
     },
   ],
@@ -680,17 +698,18 @@ export const notFoundPage = {
 
 export const studioContent = {
   title: 'UNION Studio',
-  subtitle: 'Édition du journal et modération des suggestions',
-  gateTitle: 'Accès réservé',
+  subtitle: 'Gestion éditoriale et modération',
+  gateTitle: 'Accès sécurisé',
   gateText:
-    'Le Studio est réservé aux trois créateurs. Cette version de démonstration utilise un code local. En production, l’accès se fait par invitation, avec authentification forte et sessions\n  courtes.',
-  codeLabel: 'Code d’accès',
-  enter: 'Entrer dans le Studio',
-  invalid: 'Code incorrect.',
-  logout: 'Quitter le Studio',
+    'Le Studio est réservé aux membres autorisés de l’équipe de publication. L’accès est vérifié par le serveur avec une session sécurisée.',
+  codeLabel: 'Code d’accès sécurisé',
+  enter: 'Se connecter au Studio',
+  invalid: 'Code d’accès incorrect.',
+  logout: 'Se déconnecter',
   tabs: {
     journal: 'Journal',
     moderation: 'Modération',
+    roadmap: 'Feuille de route',
     settings: 'Réglages',
     edition: 'Édition',
   },
@@ -743,7 +762,7 @@ export const studioContent = {
   },
   upload: 'Choisir une image',
   uploadNote:
-    'L’image est redimensionnée et convertie dans le navigateur. Les métadonnées EXIF sont retirées.',
+    'L’image est redimensionnée et convertie. Les métadonnées EXIF sont retirées.',
   imageTooLarge: 'L’image dépasse 4 Mo.',
   revisions: 'Historique des versions',
   revisionAt: 'Version du',
@@ -778,7 +797,7 @@ export const studioContent = {
     thresholds: 'Seuils',
     retention: 'Conservation',
     retentionNote:
-      'Une suggestion archivée reste 90 jours dans le Studio pour l’audit, puis est supprimée à l’ouverture suivante du Studio.',
+      'Une suggestion archivée reste 90 jours dans le Studio pour l’audit, puis est supprimée.',
   },
   settings: {
     title: 'Réglages de la boîte à suggestions',
@@ -799,23 +818,25 @@ export const studioContent = {
     ],
   },
   edition: {
-    title: 'Édition sans serveur',
+    title: 'Gestion de l’édition',
     intro:
-      'Le site public lit un fichier JSON statique. Aucun serveur applicatif n’est nécessaire pour publier les articles et les suggestions validées.',
+      'Le journal et les suggestions sont synchronisés avec le serveur.',
     steps: [
       'Créez ou modifiez les articles dans l’onglet Journal.',
-      'Téléchargez l’édition publique.',
-      'Remplacez public/data/edition.json par le fichier téléchargé.',
-      'Redéployez le site ou remplacez le fichier sur l’hébergement.',
+      'Les articles publiés sont visibles immédiatement sur le site.',
+      'Téléchargez une sauvegarde si nécessaire.',
     ],
     publicTitle: 'Édition publique',
     publicText:
-      'Contient les articles publiés et les suggestions publiques. Les brouillons, les votes locaux et le journal d’audit restent hors du fichier public.',
+      'Contient les articles publiés et les suggestions publiques. Les brouillons et le journal d’audit restent protégés.',
     backupTitle: 'Sauvegarde complète',
     backupText:
-      'Contient tous les articles, les brouillons, les suggestions, les votes, les signalements, les réglages et le journal d’audit. À conserver hors du site public.',
+      'Contient tous les articles, les brouillons, les suggestions, les votes, les signalements, les réglages et le journal d’audit.',
     downloadPublic: 'Télécharger l’édition publique',
     downloadBackup: 'Télécharger la sauvegarde',
+    downloadDone: 'fichier téléchargé.',
+    backupLoading: 'Chargement de la sauvegarde serveur…',
+    backupRevision: 'Révision de la sauvegarde serveur',
     importTitle: 'Importer un fichier',
     importText:
       'Un fichier union-edition remplace les contenus publics et conserve les suggestions locales en attente. Un fichier union-backup remplace toutes les données locales.',
@@ -836,9 +857,9 @@ export const studioContent = {
       'Supprimer tous les articles, suggestions et votes de ce navigateur ? Cette action ne touche pas le fichier publié.',
     resetDone: 'Données locales supprimées.',
     warning:
-      'Sans serveur, les suggestions déposées par les visiteurs restent dans leur navigateur. Pour les recevoir, utilisez un formulaire externe ou un serveur.',
+      'La publication dans le Studio rend les articles visibles en moins d’une minute sans redéploiement.',
     localOnly:
-      'Les modifications du Studio ne sont visibles par les autres visiteurs qu’après remplacement du fichier JSON et redéploiement.',
+      'Les sauvegardes permettent de conserver une copie locale de sécurité.',
   },
 } as const;
 

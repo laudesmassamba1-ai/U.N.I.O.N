@@ -10,6 +10,8 @@ Les éléments suivants ne peuvent pas être inventés. Tant qu’ils manquent, 
 - Texte des statuts, s’il existe.
 - Adresse du siège, si elle est publique.
 - Nom de domaine et hébergeur définitifs.
+- Accès à une base PostgreSQL persistante pour la production, et validation du mode de déploiement.
+- Secrets de production `STUDIO_SECRET` et `VOTE_SECRET`, générés puis conservés hors du dépôt.
 
 ## Programme
 
@@ -22,7 +24,7 @@ Les éléments suivants ne peuvent pas être inventés. Tant qu’ils manquent, 
 
 - Première édition de « Infos de la semaine au Congo ».
 - Règles de correction et de réponse aux signalements.
-- Noms des personnes autorisées à publier dans le Studio.
+- Noms des personnes autorisées à publier dans le Studio et rôles associés.
 - Sources et crédits des images de une.
 
 ## Langues

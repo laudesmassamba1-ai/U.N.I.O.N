@@ -346,7 +346,7 @@ button {
   border: 2px solid currentColor;
   padding: 0.28rem 0.55rem;
   font-family: var(--font-sans);
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   font-weight: 800;
   line-height: 1.2;
   white-space: nowrap;
@@ -373,7 +373,7 @@ button {
   display: inline-flex;
   align-items: center;
   border-bottom: 2px solid var(--ink);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 800;
   line-height: 1.3;
   padding-bottom: 0.1rem;
@@ -504,7 +504,7 @@ button {
 }
 
 .brand__sub {
-  font-size: 0.62rem;
+  font-size: 0.7rem;
   color: var(--ink-muted);
   line-height: 1.3;
   white-space: nowrap;
@@ -758,7 +758,7 @@ button {
 }
 
 .footer-nav__title {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: color-mix(in srgb, var(--paper) 60%, transparent);
   margin-bottom: 0.8rem;
@@ -1560,7 +1560,7 @@ button {
 
 .map-attribution,
 .map-source {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--ink-muted);
   margin-top: 0.8rem;
   margin-bottom: 0;
@@ -1665,7 +1665,7 @@ button {
 }
 
 .map-list__kind {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--ink-muted);
 }
 
@@ -1977,7 +1977,7 @@ button {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--ink-muted);
   margin-bottom: 0.45rem;
 }
@@ -2012,7 +2012,7 @@ button {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 0.6rem;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--ink-muted);
   margin-top: auto;
 }
@@ -2256,7 +2256,7 @@ button {
 }
 
 .field__counter {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--ink-muted);
   text-align: right;
 }
@@ -2694,11 +2694,26 @@ button {
   fill: var(--paper-2);
   stroke: var(--ink);
   stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.scene-piece-hatch {
+  stroke: none;
+  pointer-events: none;
+}
+
+.scene-piece-hatch-line {
+  stroke: var(--ink);
+  stroke-width: 1.3;
+  opacity: 0.5;
 }
 
 .scene-seam {
+  fill: none;
   stroke: var(--green);
-  stroke-width: 4;
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
 }
 
 .scenes__rail {
@@ -3003,7 +3018,7 @@ button {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--ink-muted);
   margin-bottom: 0.3rem;
 }
@@ -3827,6 +3842,366 @@ button {
 
   .hero__scroll {
     display: none;
+  }
+}
+
+/* Roadmap / Feuille de route publique */
+.home-roadmap {
+  border-top: 1px solid var(--rule);
+  background-color: var(--paper-2);
+}
+
+.roadmap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.roadmap-step {
+  border: 1px solid var(--rule-strong);
+  background-color: var(--paper);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.roadmap-step__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.75rem;
+}
+
+.roadmap-step__num {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--ink-muted);
+}
+
+.roadmap-step h3 {
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--ink);
+}
+
+.roadmap-step p {
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Charter Progress Bar */
+.charter-progress-bar {
+  position: sticky;
+  top: var(--header-height);
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background-color: var(--rule);
+  z-index: 30;
+}
+
+.charter-progress-bar__fill {
+  height: 100%;
+  background-color: var(--green);
+  transition: width 150ms ease-out;
+}
+
+/* Map Summary Bar */
+.map-summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border: 1px solid var(--rule);
+  background-color: var(--paper-2);
+  margin-bottom: 2rem;
+}
+
+.map-summary-badge strong {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  color: var(--ink);
+}
+
+.map-summary-rule {
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+}
+
+.map-region.has-actions {
+  fill: var(--paper-3);
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+/* Board Single line */
+.board-notice-banner {
+  padding: 1rem 1.5rem;
+  border: 1px solid var(--rule);
+  background-color: var(--paper-2);
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.board-vacant-single {
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.board-zones__card {
+  padding: 1.5rem;
+  border: 1px solid var(--rule);
+  background-color: var(--paper-2);
+  margin-top: 1rem;
+}
+
+/* Engagement Clauses */
+.engagement__clauses {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+
+.engagement__clause {
+  padding: 1rem;
+  border-left: 3px solid var(--rule-strong);
+  background-color: var(--paper-2);
+}
+
+.engagement__clause h3 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+  color: var(--ink-muted);
+}
+
+.engagement__clause p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.engagement__clause--promise {
+  border-left-color: var(--green);
+}
+
+.engagement__clause--notyet {
+  border-left-color: var(--yellow);
+}
+
+/* WhatsApp Card Modal */
+.card-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(11, 11, 11, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+.card-modal-content {
+  background-color: var(--paper);
+  border: 2px solid var(--rule-strong);
+  padding: 1.5rem;
+  max-width: 480px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.card-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-modal-header h2 {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  margin: 0;
+}
+
+.card-modal-preview {
+  display: flex;
+  justify-content: center;
+  background-color: var(--paper-2);
+  padding: 1rem;
+}
+
+.card-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* A4 Une & A3 Poster Print Styles */
+.a4-une,
+.a3-poster {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  .a4-une {
+    display: block !important;
+    page-break-after: always;
+  }
+
+  .a4-une__masthead {
+    text-align: center;
+    border-bottom: 3px double #000;
+    padding-bottom: 8mm;
+    margin-bottom: 8mm;
+  }
+
+  .a4-une__title {
+    font-family: 'Bitter', serif;
+    font-size: 26pt;
+    font-weight: 800;
+    margin: 0;
+  }
+
+  .a4-une__subtitle {
+    font-size: 10pt;
+    margin: 2mm 0;
+  }
+
+  .a4-une__motto {
+    font-size: 11pt;
+    font-weight: 700;
+    font-style: italic;
+    margin: 2mm 0 0 0;
+  }
+
+  .a4-une__lead {
+    margin-bottom: 6mm;
+  }
+
+  .a4-une__lead h2 {
+    font-family: 'Bitter', serif;
+    font-size: 18pt;
+    margin: 0 0 3mm 0;
+  }
+
+  .a4-une__standfirst {
+    font-size: 11pt;
+    line-height: 1.4;
+  }
+
+  .a4-une__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6mm;
+  }
+
+  .a4-une__item {
+    border-top: 1px solid #000;
+    padding-top: 3mm;
+  }
+
+  .a4-une__item h3 {
+    font-family: 'Bitter', serif;
+    font-size: 13pt;
+    margin: 0 0 2mm 0;
+  }
+
+  .a4-une__item p {
+    font-size: 9.5pt;
+    line-height: 1.35;
+    margin: 0;
+  }
+
+  .a4-une__footer {
+    border-top: 1px solid #000;
+    margin-top: 8mm;
+    padding-top: 3mm;
+    font-size: 8pt;
+    text-align: center;
+  }
+
+  .a3-poster {
+    display: block !important;
+    page-break-after: always;
+  }
+
+  .a3-poster__header {
+    text-align: center;
+    border-bottom: 3px double #000;
+    padding-bottom: 10mm;
+    margin-bottom: 10mm;
+  }
+
+  .a3-poster__title {
+    font-family: 'Bitter', serif;
+    font-size: 36pt;
+    font-weight: 800;
+    margin: 4mm 0;
+  }
+
+  .a3-poster__subtitle {
+    font-size: 14pt;
+    margin: 2mm 0;
+  }
+
+  .a3-poster__motto {
+    font-family: 'Bitter', serif;
+    font-size: 16pt;
+    font-weight: 700;
+    font-style: italic;
+    margin: 4mm 0 0 0;
+  }
+
+  .a3-poster__articles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12mm;
+  }
+
+  .a3-poster__article {
+    border-top: 2px solid #000;
+    padding-top: 5mm;
+  }
+
+  .a3-poster__article h2 {
+    font-family: 'Bitter', serif;
+    font-size: 18pt;
+    margin: 0 0 4mm 0;
+  }
+
+  .a3-poster__article p {
+    font-size: 12pt;
+    line-height: 1.5;
+    margin-bottom: 3mm;
+  }
+
+  .a3-poster__footer {
+    border-top: 1px solid #000;
+    margin-top: 15mm;
+    padding-top: 4mm;
+    text-align: center;
+    font-size: 11pt;
   }
 }
 

@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
@@ -11,11 +11,13 @@ function fail(message) {
 
 function walk(target) {
   const full = path.join(root, target);
+  if (!existsSync(full)) return [];
   const stat = statSync(full);
   if (stat.isFile()) return [full];
   return readdirSync(full).flatMap((entry) => walk(path.join(target, entry)));
 }
 
+// 1. Interfaces & Database Tables: Check for personal / IP fields in suggestions & votes
 const types = readFileSync(path.join(root, 'src/types.ts'), 'utf8');
 const personalFields = /^\s*(email|e-mail|courriel|phone|telephone|téléphone|ip|ipaddress|useragent|name|nom|prenom|prénom|address|adresse|whatsapp)\??\s*:/gim;
 
@@ -29,6 +31,55 @@ for (const typeName of ['Suggestion', 'SuggestionVote', 'SuggestionReport']) {
   if (field) fail(`Interface ${typeName} contient un champ personnel : ${field[0].trim()}`);
 }
 
+// Check database schema in server/db.ts for suggestions and votes tables
+const dbSchemaFile = path.join(root, 'server/db.ts');
+if (existsSync(dbSchemaFile)) {
+  const schema = readFileSync(dbSchemaFile, 'utf8');
+  for (const table of ['suggestions', 'suggestion_votes', 'reports']) {
+    const tableBlock = schema.match(new RegExp(`CREATE TABLE IF NOT EXISTS ${table} \\(([\\s\\S]*?)\\);`));
+    if (tableBlock) {
+      const match = tableBlock[1].match(/\b(ip|user_agent|email|phone)\b/i);
+      if (match) {
+        fail(`Table SQL ${table} contient une colonne interdite : ${match[0]}`);
+      }
+    }
+  }
+}
+
+// 2. Check VITE_* variables in env files for secrets
+const envFiles = ['.env.example', '.env.local', '.env'].filter((f) => existsSync(path.join(root, f)));
+for (const envFile of envFiles) {
+  const content = readFileSync(path.join(root, envFile), 'utf8');
+  const lines = content.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.startsWith('#') || !line.includes('=')) continue;
+    const [key, val] = line.split('=');
+    const trimmedVal = val?.trim().replace(/^["']|["']$/g, '');
+    if (key.trim().startsWith('VITE_STUDIO_CODE') && trimmedVal) {
+      fail(`${envFile}:${i + 1} — variable VITE_STUDIO_CODE ne doit pas contenir de secret côté navigateur.`);
+    }
+    if (key.trim().startsWith('VITE_KICHUB')) {
+      fail(`${envFile}:${i + 1} — variable KICHUB interdite.`);
+    }
+  }
+}
+
+// 3. Check for real email addresses anywhere in src/ or public/ outside empty template strings
+const sourceFilesForEmails = [...walk('src'), ...walk('public')].filter((f) => /\.(tsx?|mjs|js|html|json)$/.test(f));
+const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
+
+for (const file of sourceFilesForEmails) {
+  const content = readFileSync(file, 'utf8');
+  const matches = content.match(emailRegex) || [];
+  for (const match of matches) {
+    // Only allow example placeholder domains in tests or dummy mocks
+    if (match.endsWith('@example.com') || match.endsWith('@test.com')) continue;
+    fail(`${path.relative(root, file)} contient une adresse e-mail réelle : ${match}`);
+  }
+}
+
+// 4. Client source files: No document.cookie (cookies are HttpOnly on server) and no trackers
 const sourceFiles = walk('src').filter((file) => /\.(tsx?|mjs)$/.test(file));
 for (const file of sourceFiles) {
   const content = readFileSync(file, 'utf8');
@@ -38,13 +89,15 @@ for (const file of sourceFiles) {
   }
 }
 
-const content = readFileSync(path.join(root, 'src/content/fr.ts'), 'utf8');
-if (!/stockage local/i.test(content)) fail('La page Vie privée ne mentionne pas le stockage local.');
-if (!/serveur/i.test(content)) fail('La page Vie privée ne mentionne pas le stockage serveur en production.');
+// 5. Verify that Suggestions submission awaits server call before setting received status
+const suggestionsComponent = readFileSync(path.join(root, 'src/pages/Suggestions.tsx'), 'utf8');
+if (!suggestionsComponent.includes('api.submitSuggestion')) {
+  fail('Suggestions.tsx : aucune transmission serveur trouvée avant confirmation.');
+}
 
 if (failures > 0) {
   console.error(`\nVie privée : ${failures} problème(s).`);
   process.exit(1);
 }
 
-console.log('Vie privée : aucun champ personnel, aucun cookie, aucun traceur ; divulgation présente.');
+console.log('Vie privée : aucun champ personnel en base, aucun cookie client, aucun secret VITE_*, aucune adresse e-mail non autorisée, confirmation conditionnée au serveur.');

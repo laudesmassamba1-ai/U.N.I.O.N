@@ -56,14 +56,13 @@ function RouteView({ path, motionAllowed }: { path: string; motionAllowed: boole
 export default function App() {
   const route = useRoute();
   const preferences = useDisplayPreferences();
-  useEditionSync();
+  const isHome = route.path === '/';
+  const isStudio = route.path === '/studio' || route.path.startsWith('/studio/');
+  useEditionSync(!isStudio, route.path);
   useRevealOnScroll(route.path);
   useScrollToTopOnRoute(route.path);
   const database = useDatabase();
   const [openingDone, setOpeningDone] = useState(() => route.path !== '/');
-
-  const isHome = route.path === '/';
-  const isStudio = route.path === '/studio' || route.path.startsWith('/studio/');
 
   useEffect(() => {
     if (!isHome) setOpeningDone(true);

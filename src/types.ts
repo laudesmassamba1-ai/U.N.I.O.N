@@ -142,15 +142,3 @@ export interface SuggestionInput {
   category: string;
   department: string | null;
 }
-
-export interface MemberRegistration {
-  id?: string;
-  text: string;
-  category: string;
-  department: string | null;
-  status?: 'pending';
-  createdAt?: string;
-  updatedAt?: string;
-  publishedAt?: string | null;
-  archivedAt?: string | null;
-}

@@ -83,29 +83,56 @@ function ProuverVisual({ t }: { t: number }) {
   );
 }
 
+/*
+ * Deux pièces réellement différentes, dont les contours se complètent au pixel.
+ * À gauche une plaque chanfreinée portant deux tenons de profondeurs inégales
+ * (46 puis 38) ; à droite une pièce plus large, à bord droit incliné et encoche
+ * en V, creusée de deux mortaises de même profondeur. Les deux tracés partagent
+ * exactement la même ligne de joint : à l'arrivée, aucun jour, aucun recouvrement.
+ */
+const PIECE_LEFT =
+  'M92 70 L56 106 L56 250 L310 250 L310 212 L348 212 L348 168 L310 168 L310 140 L356 140 L356 96 L310 96 L310 70 Z';
+const PIECE_RIGHT =
+  'M310 86 L462 86 L502 130 L542 86 L588 86 L566 250 L310 250 L310 212 L348 212 L348 168 L310 168 L310 140 L356 140 L356 96 L310 96 Z';
+const PIECE_JOINT =
+  'M310 86 L310 96 L356 96 L356 140 L310 140 L310 168 L348 168 L348 212 L310 212 L310 250';
+
 function TravaillerVisual({ t }: { t: number }) {
   const offset = (1 - t) * 130;
   return (
-    <svg viewBox="0 0 620 320" className="scene-svg" role="img" aria-label="Deux pièces se rejoignent pour former un tout.">
+    <svg
+      viewBox="0 0 620 320"
+      className="scene-svg"
+      role="img"
+      aria-label="Une plaque à deux tenons et une pièce à deux mortaises, de formes différentes, s’emboîtent exactement."
+    >
+      <defs>
+        <pattern
+          id="union-piece-hatch"
+          width="8"
+          height="8"
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(45)"
+        >
+          <line x1="0" y1="0" x2="0" y2="8" className="scene-piece-hatch-line" />
+        </pattern>
+      </defs>
       <g style={{ transform: `translateX(${-offset}px)` }}>
-        <path
-          className="scene-piece scene-piece--a"
-          d="M56 70 H292 V130 H330 V190 H292 V250 H56 Z"
-        />
+        <path className="scene-piece scene-piece--a" d={PIECE_LEFT} />
       </g>
       <g style={{ transform: `translateX(${offset}px)` }}>
-        <path
-          className="scene-piece scene-piece--b"
-          d="M564 70 H328 V130 H290 V190 H328 V250 H564 Z"
-        />
+        <path className="scene-piece scene-piece--b" d={PIECE_RIGHT} />
+        <path className="scene-piece-hatch" d={PIECE_RIGHT} fill="url(#union-piece-hatch)" />
       </g>
-      <line
-        x1="310"
-        y1="62"
-        x2="310"
-        y2="258"
+      <path
         className="scene-seam"
-        style={{ opacity: clamp01((t - 0.72) * 5) }}
+        d={PIECE_JOINT}
+        pathLength={1}
+        style={{
+          opacity: clamp01((t - 0.66) * 5),
+          strokeDasharray: 1,
+          strokeDashoffset: 1 - clamp01((t - 0.66) * 4),
+        }}
       />
       <text x="56" y="292" className="scene-label">
         Deux pièces, un seul ouvrage.

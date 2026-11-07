@@ -11,13 +11,14 @@
     "lint:copy": "node scripts/check-copy.mjs",
     "lint:logo": "node scripts/check-logo.mjs",
     "lint:privacy": "node scripts/check-privacy.mjs",
+    "lint:routes": "node scripts/check-routes.mjs",
     "lint:motion": "node scripts/check-motion.mjs",
     "lint:design": "node scripts/check-design.mjs",
     "lint:edition": "node scripts/edition.mjs check",
     "edition:publish": "node scripts/edition.mjs publish",
     "edition:check": "node scripts/edition.mjs check",
     "test": "vitest run",
-    "check": "pnpm typecheck && pnpm lint:copy && pnpm lint:logo && pnpm lint:privacy && pnpm lint:motion && pnpm lint:design && pnpm lint:edition && pnpm test && pnpm build"
+    "check": "pnpm typecheck && pnpm lint:copy && pnpm lint:logo && pnpm lint:privacy && pnpm lint:routes && pnpm lint:motion && pnpm lint:design && pnpm lint:edition && pnpm test && pnpm build"
   },
   "dependencies": {
     "react": "^19.0.1",

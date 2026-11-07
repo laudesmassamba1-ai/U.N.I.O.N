@@ -34,6 +34,11 @@ export function DepartmentMap() {
   const currentInfo = departments.find((department) => department.name === current);
   const currentActions = current ? departmentActions[current] ?? [] : [];
 
+  const activeCount = useMemo(
+    () => departments.filter((d) => (departmentActions[d.name]?.length ?? 0) > 0).length,
+    [],
+  );
+
   const network = useMemo(() => {
     if (!bourse) return [];
     const centroids = departmentsGeo.departments.map((department) => ({
@@ -49,6 +54,15 @@ export function DepartmentMap() {
 
   return (
     <section className="map-section" data-motion="carte" aria-labelledby="carte-titre">
+      <div className="map-summary-bar" data-reveal>
+        <span className="map-summary-badge">
+          <strong>{activeCount} / 12</strong> départements avec action consignée
+        </span>
+        <span className="map-summary-rule">
+          Règle de l’article 2 : action requise dans au moins 6 départements pour une candidature
+        </span>
+      </div>
+
       <div className="map-layout">
         <div className="map-canvas" data-reveal>
           <svg
@@ -60,11 +74,12 @@ export function DepartmentMap() {
             <g className="map-regions">
               {departmentsGeo.departments.map((department, index) => {
                 const isActive = current === department.name;
+                const hasActions = (departmentActions[department.name]?.length ?? 0) > 0;
                 return (
                   <path
                     key={department.name}
                     d={department.path}
-                    className={`map-region${isActive ? ' is-active' : ''}`}
+                    className={`map-region${isActive ? ' is-active' : ''}${hasActions ? ' has-actions' : ''}`}
                     style={{ ['--i' as string]: index } as CSSProperties}
                     pathLength={1}
                     onMouseEnter={() => setHovered(department.name)}
@@ -82,6 +97,7 @@ export function DepartmentMap() {
                 {network.map((line, index) => (
                   <line
                     key={index}
+                    className="map-network-line"
                     x1={line.from.x}
                     y1={line.from.y}
                     x2={line.to.x}
@@ -144,9 +160,9 @@ export function DepartmentMap() {
               </>
             ) : (
               <>
-                <p className="eyebrow">La carte</p>
+                <p className="eyebrow">La carte du terrain</p>
                 <p className="map-panel__hint">
-                  Touchez un département pour lire son nom et les actions consignées.
+                  Sélectionnez un département sur la carte ou dans la liste pour consulter les actions.
                 </p>
               </>
             )}

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { ArticleCard } from '../components/ArticleCard';
 import { JunctionTitle } from '../components/JunctionTitle';
 import { Link } from '../components/Link';
@@ -8,7 +9,6 @@ import {
   EmptyState,
   Section,
   SectionHead,
-  StatusBadge,
   StatusStamp,
 } from '../components/ui';
 import {
@@ -24,11 +24,31 @@ import {
 } from '../content/fr';
 import { editionLabel, groupEditions } from '../lib/articles';
 import { useDatabase } from '../lib/hooks';
+import { api, type RoadmapStep } from '../lib/api';
+
+const DEFAULT_ROADMAP: RoadmapStep[] = [
+  { id: 'step-1', stepOrder: 1, title: 'Charte : projet en relecture', status: 'en_cours', description: 'Soumis à la validation des fondateurs.', updatedAt: '' },
+  { id: 'step-2', stepOrder: 2, title: 'Bureau : en constitution', status: 'en_cours', description: 'Désignation des cinq postes au fur et à mesure.', updatedAt: '' },
+  { id: 'step-3', stepOrder: 3, title: 'Dossier légal : à venir', status: 'a_venir', description: 'Dépôt des statuts dès stabilisation du bureau.', updatedAt: '' },
+];
 
 export default function Home({ motionAllowed }: { motionAllowed: boolean }) {
   const database = useDatabase();
   const editions = groupEditions(database.articles);
   const latest = editions[0] ?? null;
+  const [roadmapSteps, setRoadmapSteps] = useState<RoadmapStep[]>(DEFAULT_ROADMAP);
+
+  useEffect(() => {
+    let alive = true;
+    api.getRoadmap().then((res) => {
+      if (alive && res?.steps?.length > 0) {
+        setRoadmapSteps(res.steps);
+      }
+    }).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   return (
     <>
@@ -57,8 +77,7 @@ export default function Home({ motionAllowed }: { motionAllowed: boolean }) {
           <div className="facts__note" data-reveal>
             <StatusStamp label="Mouvement en cours de constitution" tone="attention" />
             <p>
-              Le mouvement est en cours de constitution. Le dépôt du dossier est prévu, à
-              confirmer par le bureau.
+              Mouvement en cours de constitution.
             </p>
           </div>
         </Container>
@@ -72,6 +91,32 @@ export default function Home({ motionAllowed }: { motionAllowed: boolean }) {
             <p>« {site.motto} »</p>
             <cite>Devise de l’U.N.I.O.N</cite>
           </blockquote>
+        </Container>
+      </Section>
+
+      {/* Public Roadmap / Feuille de route */}
+      <Section className="home-roadmap" motion="feuille-de-route">
+        <Container>
+          <SectionHead
+            eyebrow="Chantiers"
+            title={home.roadmapTitle}
+            intro={home.roadmapIntro}
+          />
+          <div className="roadmap-grid" data-reveal>
+            {roadmapSteps.map((step, idx) => (
+              <div key={step.id || idx} className="roadmap-step">
+                <div className="roadmap-step__header">
+                  <span className="roadmap-step__num">0{idx + 1}</span>
+                  <StatusStamp
+                    label={step.status === 'fait' ? 'Fait' : step.status === 'en_cours' ? 'En cours' : 'À venir'}
+                    tone={step.status === 'fait' ? 'neutral' : step.status === 'en_cours' ? 'attention' : 'neutral'}
+                  />
+                </div>
+                <h3>{step.title}</h3>
+                {step.description ? <p>{step.description}</p> : null}
+              </div>
+            ))}
+          </div>
         </Container>
       </Section>
 
@@ -101,37 +146,35 @@ export default function Home({ motionAllowed }: { motionAllowed: boolean }) {
         <Container>
           <SectionHead
             eyebrow="Le Bureau"
-            title="Cinq postes, une règle d’or"
+            title="Cinq postes, une règle d’équilibre"
             intro={board.intro}
           />
           <div className="board-diagram board-diagram--compact" data-reveal>
             <div className="board-diagram__president">
               <span className="board-diagram__label">Président National</span>
-              <StatusBadge label={board.vacant} tone="neutral" />
             </div>
             <div className="board-diagram__line" aria-hidden="true" />
             <div className="board-diagram__vps">
               <div>
-                <span className="board-diagram__label">Vice-Président Nord</span>
-                <StatusBadge label={board.vacant} tone="neutral" />
+                <span className="board-diagram__label">Vice-Président chargé de la zone Nord</span>
               </div>
               <div>
-                <span className="board-diagram__label">Vice-Président Sud</span>
-                <StatusBadge label={board.vacant} tone="neutral" />
+                <span className="board-diagram__label">Vice-Président chargé de la zone Sud</span>
               </div>
             </div>
             <div className="board-diagram__line" aria-hidden="true" />
             <div className="board-diagram__others">
               <div>
                 <span className="board-diagram__label">Secrétaire Général</span>
-                <StatusBadge label={board.vacant} tone="neutral" />
               </div>
               <div>
                 <span className="board-diagram__label">Trésorier Général</span>
-                <StatusBadge label={board.vacant} tone="neutral" />
               </div>
             </div>
           </div>
+          <p className="board-vacant-single" data-reveal>
+            {board.vacantSingleLine}
+          </p>
           <div className="golden-rule" data-reveal>
             <p className="eyebrow">{board.goldenRuleTitle}</p>
             <p>{board.goldenRule}</p>
@@ -240,7 +283,6 @@ export default function Home({ motionAllowed }: { motionAllowed: boolean }) {
             </div>
             <div className="suggestions-teaser" data-reveal>
               <p>{suggestionsPage.moderationNote}</p>
-              <p className="note">{suggestionsPage.localNote}</p>
               <div className="section-actions">
                 <ButtonLink href="/suggestions">{home.suggestionsCta}</ButtonLink>
               </div>
@@ -266,7 +308,7 @@ export default function Home({ motionAllowed }: { motionAllowed: boolean }) {
                 </ButtonLink>
               )}
               <Link to="/rejoindre" className="text-link">
-                Lire les conditions de participation
+                Voir les modalités de contact
               </Link>
             </div>
           </div>

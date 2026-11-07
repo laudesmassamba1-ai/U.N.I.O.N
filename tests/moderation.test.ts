@@ -38,10 +38,17 @@ describe('modération des suggestions', () => {
     );
   });
 
-  it('refuse les ethnonymes', () => {
-    expect(analyseSuggestion({ ...valid, text: 'Cette idée est réservée aux Bakongo.' }).code).toBe(
+  it('refuse les insultes et propos haineux', () => {
+    expect(analyseSuggestion({ ...valid, text: 'Ce sont des sous-hommes incapables.' }).code).toBe(
       'hate',
     );
+  });
+
+  it('signale et place en file de modération humaine les suggestions contenant un ethnonyme au lieu de les refuser', () => {
+    const res = analyseSuggestion({ ...valid, text: 'Cette proposition concerne l’histoire des Bakongo au Congo.' });
+    expect(res.ok).toBe(true);
+    expect(res.flagged).toBe(true);
+    expect(res.flagReason).toContain('ethnonyme');
   });
 
   it('refuse les doublons', () => {

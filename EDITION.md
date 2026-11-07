@@ -1,39 +1,29 @@
-# Publier sans serveur
+# Édition publique et secours statique
 
-Le site peut fonctionner sur un hébergement statique. Aucun serveur applicatif, aucune base de données et aucun compte ne sont nécessaires pour lire le site.
+Le serveur est la source de vérité. `GET /api/v1/edition` sert les articles publiés, les suggestions validées, les réglages et la feuille de route. Le Studio écrit dans la base via l’API.
 
-Le contenu public est lu dans un seul fichier :
-
-```text
-public/data/edition.json
-```
-
-Après le build, ce fichier est copié dans :
-
-```text
-dist/data/edition.json
-```
+`public/data/edition.json` reste un fichier de secours en lecture seule. Il est utilisé quand l’API est indisponible, et peut être publié sur un hébergement statique.
 
 ## 1. Modifier le contenu
 
 1. Ouvrir `/#/studio`.
-2. Entrer dans le Studio avec le code local.
+2. Se connecter avec le code serveur (`STUDIO_SECRET`).
 3. Créer, modifier, publier, archiver ou supprimer les articles.
 4. Modérer les suggestions.
-5. Ouvrir l’onglet **Édition**.
+5. Ouvrir l’onglet **Édition** pour télécharger une copie de secours.
 
-## 2. Télécharger l’édition publique
+Chaque action est envoyée à l’API. Une modification n’est affichée comme réussie qu’après une réponse serveur.
 
-Dans l’onglet **Édition**, cliquer sur **Télécharger l’édition publique**.
+## 2. Contenu de l’édition publique
 
-Le fichier `edition.json` contient :
+L’édition contient :
 
 - les articles publiés, sans brouillon et sans article supprimé ;
-- les suggestions publiques validées ;
+- les suggestions publiques validées, avec leurs réponses ;
 - les réglages des seuils ;
 - une révision et une date de mise à jour.
 
-Il ne contient pas :
+Elle ne contient pas :
 
 - les brouillons ;
 - les votes locaux ;
@@ -41,21 +31,11 @@ Il ne contient pas :
 - le journal d’audit ;
 - l’historique des versions d’articles.
 
-## 3. Remplacer le fichier
+## 3. Télécharger le secours
 
-Deux méthodes possibles.
+Dans l’onglet **Édition**, cliquer sur **Télécharger l’édition publique**.
 
-### Méthode locale
-
-Remplacer `public/data/edition.json` par le fichier téléchargé, puis relancer :
-
-```bash
-pnpm build
-```
-
-Le dossier `dist/` contient la nouvelle version du site.
-
-### Méthode par script
+Pour remplacer le fichier de secours :
 
 ```bash
 pnpm edition:publish /chemin/vers/edition.json
@@ -64,42 +44,21 @@ pnpm build
 
 Le script vérifie le fichier, augmente la révision si nécessaire et écrit `public/data/edition.json`.
 
-### Méthode directe sur l’hébergement
-
-Si l’hébergement permet de remplacer un fichier par FTP ou par un gestionnaire de fichiers, remplacer directement :
-
-```text
-dist/data/edition.json
-```
-
-Le site lit ce fichier à chaque chargement avec une priorité réseau, puis utilise la copie hors ligne si le réseau échoue.
-
 ## 4. Déployer
 
-Déposer le contenu du dossier `dist/` sur l’hébergement statique :
+Sur Vercel, `vercel.json` route `/api/*` vers `api/index.ts` et sert le reste depuis `dist/`.
 
-- Netlify ;
-- Vercel ;
-- GitHub Pages ;
-- Cloudflare Pages ;
-- un serveur web classique avec FTP.
+Un hébergement purement statique peut servir `dist/` et `dist/data/edition.json`, mais il perd les suggestions partagées, les votes, la modération et le Studio serveur.
 
-Le site utilise des adresses avec `#`, donc aucune règle de réécriture serveur n’est nécessaire pour les pages.
+## 5. Télécharger une sauvegarde serveur
 
-## 5. Importer une sauvegarde
+Dans l’onglet **Édition**, **Télécharger la sauvegarde** demande au serveur un instantané complet : tous les articles, brouillons, suggestions, votes, signalements, réglages et journal d’audit.
 
-Dans l’onglet **Édition** :
-
-- **Télécharger la sauvegarde** produit un fichier `union-sauvegarde.json` avec tous les articles, brouillons, suggestions, votes, signalements, réglages et journal d’audit.
-- **Choisir un fichier JSON** importe un fichier `union-edition` ou `union-backup`.
-
-Un fichier `union-backup` remplace toutes les données locales. Il ne doit pas être publié sur le site public.
-
-Un fichier `union-edition` remplace les articles et les suggestions publiques, mais conserve les suggestions locales encore en attente.
+Le fichier produit est un export de sécurité. Il ne remplace pas la base et ne doit pas être publié sur le site public. La restauration d’une sauvegarde n’est pas encore exposée dans le Studio.
 
 ## 6. Révision
 
-Chaque fichier contient un champ `revision`. Le site applique le fichier publié seulement si sa révision est supérieure à la révision locale déjà appliquée.
+Chaque fichier contient un champ `revision`. Le serveur le calcule de façon déterministe à partir du contenu public et renvoie un ETag. Le fichier de secours applique une édition seulement si sa révision est supérieure à la révision locale déjà appliquée.
 
 Le script `edition:publish` augmente la révision automatiquement. Si le fichier est remplacé à la main, il faut augmenter `revision` et `updatedAt` pour que les navigateurs déjà ouverts prennent la mise à jour.
 
@@ -107,18 +66,18 @@ Le script `edition:publish` augmente la révision automatiquement. Si le fichier
 
 Deux choix dans le Studio :
 
-- **Adresse de l’image** : placer le fichier dans `public/assets/` et utiliser `/assets/nom-du-fichier.jpg`. Le fichier JSON reste petit.
-- **Téléverser une image** : l’image est intégrée au JSON en base64. Cela fonctionne, mais le fichier devient lourd.
+- **Adresse de l’image** : placer le fichier dans `public/assets/` et utiliser `/assets/nom-du-fichier.jpg`.
+- **Téléverser une image** : l’image est intégrée au JSON en base64. Le fichier devient plus lourd.
 
 Pour un article publié, le texte alternatif, la légende et le crédit sont obligatoires.
 
 ## 8. Limites honnêtes
 
-- Les suggestions déposées par les visiteurs restent dans leur navigateur. Le bureau ne les reçoit pas automatiquement.
-- Les votes sont locaux. Ils ne sont pas partagés entre visiteurs.
-- Le code du Studio est un rideau de démonstration. Toute personne qui possède le code peut modifier les données locales de son navigateur.
-- Le fichier `edition.json` est public. Ne jamais y placer de brouillon, de note interne, de donnée personnelle ou de journal d’audit.
-- Pour recevoir les suggestions et les votes de tous les visiteurs, un serveur ou un formulaire externe reste nécessaire.
+- SQLite convient au développement. Vercel exige un stockage partagé et persistant, par exemple PostgreSQL avec un adaptateur à écrire.
+- Le fichier de secours est public. Ne jamais y placer de brouillon, de note interne, de donnée personnelle ou de journal d’audit.
+- Le Studio dépend de `STUDIO_SECRET`. Sans ce secret, aucune session ne peut être ouverte.
+- Les votes exigent `VOTE_SECRET` (32 caractères minimum) en production. Sans ce secret, l’API refuse les votes avec un code 503 au lieu de perdre l’unicité des empreintes.
+- Les votes et signalements ne sont partagés entre visiteurs que lorsque l’API et la base sont disponibles.
 
 ## 9. Vérifier le fichier
 

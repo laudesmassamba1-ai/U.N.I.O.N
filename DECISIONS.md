@@ -1,10 +1,10 @@
 # Décisions
 
-## 1. Applications clientes plutôt que serveur
+## 1. Serveur applicatif
 
-Le cahier des charges initial décrivait Next.js, pnpm et PostgreSQL. L’environnement disponible est une application Vite + React sans serveur ni base de données. Le site a été construit comme une application cliente avec un adaptateur de stockage local.
+Le cahier des charges initial décrivait Next.js, pnpm et PostgreSQL. L’application est construite avec Vite + React et un serveur HTTP Node. Le serveur est la source de vérité pour l’édition, les suggestions, les votes, les signalements et le Studio.
 
-Conséquence : les articles, suggestions et votes ne sont pas partagés entre les visiteurs. La page Vie privée et le README l’indiquent explicitement.
+Le déploiement Vercel est préparé avec `vercel.json` et `api/index.ts`. La base actuelle est SQLite pour le développement. Aucun adaptateur PostgreSQL n’est encore écrit : Vercel n’offre pas de stockage SQLite persistant.
 
 ## 2. Pas de contenu inventé
 
@@ -20,7 +20,7 @@ La carte utilise les tracés ADM1 de geoBoundaries pour les 12 départements du 
 
 ## 5. Suggestions anonymes
 
-Le modèle ne contient ni nom, ni e-mail, ni téléphone, ni adresse IP, ni agent utilisateur. Un jeton aléatoire local sert à éviter les votes multiples ; seule une empreinte HMAC est conservée. L’anonymat total et le principe « une personne, une voix » ne peuvent pas être garantis ensemble, et l’interface le dit.
+Le modèle ne contient ni nom, ni e-mail, ni téléphone, ni adresse IP, ni agent utilisateur. Un jeton aléatoire local sert à éviter les votes multiples ; seule une empreinte HMAC est conservée. En production, `VOTE_SECRET` (32 caractères minimum) est obligatoire : sans lui, l’API refuse les votes avec un code 503 plutôt que de perdre l’unicité des empreintes. L’anonymat total et le principe « une personne, une voix » ne peuvent pas être garantis ensemble, et l’interface le dit.
 
 ## 6. Modération avant publication
 
@@ -28,16 +28,22 @@ Toute suggestion est déposée avec le statut `pending`. Elle n’apparaît publ
 
 ## 7. Seuils réglables
 
-Les seuils par défaut sont ceux du cahier des charges : 25 votes et 65 % d’avis utiles pour retenir, 25 votes et 70 % d’avis inutiles pour archiver, 60 jours avant expiration, 90 jours de conservation après archivage. Ils sont modifiables dans le Studio.
+Les seuils par défaut sont ceux du cahier des charges : 25 votes et 65 % d’avis utiles pour retenir, 25 votes et 70 % d’avis inutiles pour archiver, 60 jours avant expiration, 90 jours de conservation après archivage. Ils sont modifiables dans le Studio et stockés côté serveur.
 
-## 8. Studio non sécurisé
+## 8. Studio protégé côté serveur
 
-L’accès au Studio repose sur `VITE_STUDIO_CODE`, une phrase de passe côté navigateur. C’est un rideau de démonstration, pas une authentification. Une mise en production exige un serveur, une session signée et des rôles vérifiés côté serveur.
+L’ouverture du Studio exige `STUDIO_SECRET` (16 caractères minimum). Le serveur vérifie le code en temps constant, émet une session signée HMAC valable deux heures et la place dans un cookie `HttpOnly` `SameSite=Strict`. Le code n’est plus stocké côté client et le Studio ne confirme rien sans réponse serveur.
 
 ## 9. Service worker limité
 
-Le service worker ne met en cache que les navigations publiques et la page explicitement mise hors ligne depuis un article. Il ignore le Studio. Il ne remplace pas une stratégie de cache serveur.
+Le service worker met en cache les navigations publiques et la page explicitement mise hors ligne depuis un article. Il ignore le Studio. Il ne remplace pas une stratégie de cache serveur.
 
 ## 10. Textes français seulement
 
 Les traductions en lingala et en kituba ne sont pas fournies. Aucune traduction automatique n’a été inventée. La Charte mentionne l’usage des deux langues dans les réunions, sans prétendre que le site est déjà bilingue.
+
+## 11. Édition de secours
+
+L’API sert l’édition publique avec un ETag et un cache de 60 secondes. `public/data/edition.json` reste un fichier de secours en lecture seule, produit par le Studio. Il ne remplace pas la base serveur et ne doit contenir ni brouillon, ni vote, ni signalement, ni journal d’audit. La sauvegarde complète est un export serveur téléchargeable ; sa restauration n’est pas exposée dans le Studio.
+
+Une édition publique conserve les suggestions locales encore en attente ainsi que les votes et signalements locaux lors d’une fusion. Le serveur reste prioritaire dès qu’il répond.

@@ -347,8 +347,8 @@ export function mergeEdition(current: DatabaseShape, document: EditionDocument):
   return {
     articles: document.articles,
     suggestions: [...localPending, ...document.suggestions],
-    votes: [],
-    reports: [],
+    votes: current.votes.filter((vote) => editionIds.has(vote.suggestionId)),
+    reports: current.reports.filter((report) => editionIds.has(report.suggestionId)),
     settings: document.settings,
     audit: current.audit,
   };
@@ -390,10 +390,23 @@ export function editionUrl(): string {
 
 export async function fetchRemoteEdition(): Promise<EditionDocument | null> {
   if (typeof window === 'undefined' || typeof fetch !== 'function') return null;
-  const response = await fetch(editionUrl(), { cache: 'no-cache' });
-  if (!response.ok) return null;
-  const raw = (await response.json()) as unknown;
-  return parseEditionDocument(raw);
+  try {
+    const apiRes = await fetch('/api/v1/edition', { cache: 'no-cache' });
+    if (apiRes.ok) {
+      const raw = (await apiRes.json()) as unknown;
+      return parseEditionDocument(raw);
+    }
+  } catch {
+    // Server not available, fall through to static file
+  }
+  try {
+    const response = await fetch(editionUrl(), { cache: 'no-cache' });
+    if (!response.ok) return null;
+    const raw = (await response.json()) as unknown;
+    return parseEditionDocument(raw);
+  } catch {
+    return null;
+  }
 }
 
 export function getAppliedEditionRevision(): number {

@@ -1,0 +1,14 @@
+{
+  "buildCommand": "pnpm build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/p/:slug",
+      "destination": "/api/v1/share/:slug"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api"
+    }
+  ]
+}

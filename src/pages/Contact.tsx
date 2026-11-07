@@ -17,10 +17,9 @@ export default function Contact() {
         <Container>
           <div className="contact__grid">
             <div data-reveal>
-              <h2>Le canal principal</h2>
+              <h2>Le groupe WhatsApp</h2>
               <p>
-                Le groupe WhatsApp est le canal principal du mouvement. Le lien est fourni par
-                le fondateur.
+                Le groupe WhatsApp est le canal du mouvement. Vous y posez vos questions et suivez les annonces.
               </p>
               {site.whatsappUrl ? (
                 <ButtonLink href={site.whatsappUrl} external>
@@ -30,14 +29,24 @@ export default function Contact() {
                 <p className="note">{contactPage.unavailable}</p>
               )}
             </div>
+
+            {site.unionEmail ? (
+              <div data-reveal>
+                <h2>{contactPage.emailTitle}</h2>
+                <p>{contactPage.emailText}</p>
+                <p className="contact-email">
+                  <a href={`mailto:${site.unionEmail}`} className="text-link">
+                    {site.unionEmail}
+                  </a>
+                </p>
+              </div>
+            ) : null}
+
             <div data-reveal>
               <h2>{contactPage.mediaTitle}</h2>
               <p>{contactPage.mediaText}</p>
             </div>
-            <div data-reveal>
-              <h2>{contactPage.addressTitle}</h2>
-              <p>{contactPage.addressText}</p>
-            </div>
+
             <div data-reveal>
               <h2>Données personnelles</h2>
               <p>{contactPage.noForm}</p>

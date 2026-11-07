@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ArticleBody } from '../components/ArticleBody';
 import { Link } from '../components/Link';
 import { PageHeader } from '../components/Layout';
 import { Container, NatureBadge, Section } from '../components/ui';
+import { WhatsAppCardModal } from '../components/WhatsAppCardModal';
 import { articleNatures, journalPage, site } from '../content/fr';
 import { findArticle } from '../lib/articles';
 import { formatDate, formatDateTime } from '../lib/dates';
@@ -23,6 +24,8 @@ export default function ArticlePage({ slug }: { slug: string }) {
   const database = useDatabase();
   const article = findArticle(database.articles, slug);
   useRouteTitle(article?.title ?? 'Article introuvable');
+
+  const [showWhatsAppCard, setShowWhatsAppCard] = useState(false);
 
   useEffect(() => {
     if (!article) return;
@@ -48,8 +51,8 @@ export default function ArticlePage({ slug }: { slug: string }) {
   const modified = article.publishedAt && modifiedAt - publishedAt > 60 * 1000;
 
   const share = () => {
-    const url = window.location.href;
-    const text = `${article.title}\n${url}`;
+    const shareUrl = `${window.location.origin}/p/${encodeURIComponent(slug)}`;
+    const text = `${article.title}\n${shareUrl}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
   };
 
@@ -94,6 +97,16 @@ export default function ArticlePage({ slug }: { slug: string }) {
             {journalPage.share}
             <span className="arrow" aria-hidden="true">
               ↗
+            </span>
+          </button>
+          <button
+            type="button"
+            className="button button--outline"
+            onClick={() => setShowWhatsAppCard(true)}
+          >
+            Carte statut WhatsApp (1080 × 1350)
+            <span className="arrow" aria-hidden="true">
+              ↓
             </span>
           </button>
           <button type="button" className="button button--quiet" onClick={cacheOffline}>
@@ -158,6 +171,16 @@ export default function ArticlePage({ slug }: { slug: string }) {
           </div>
         </Container>
       </Section>
+
+      {showWhatsAppCard ? (
+        <WhatsAppCardModal
+          title={article.title}
+          standfirst={article.standfirst}
+          category={article.category}
+          date={published}
+          onClose={() => setShowWhatsAppCard(false)}
+        />
+      ) : null}
     </>
   );
 }

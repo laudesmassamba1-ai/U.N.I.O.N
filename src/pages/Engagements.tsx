@@ -1,6 +1,6 @@
 import { Link } from '../components/Link';
 import { PageHeader } from '../components/Layout';
-import { Container, Section, SectionHead } from '../components/ui';
+import { Container, Section, SectionHead, StatusStamp } from '../components/ui';
 import { engagements } from '../content/fr';
 import { useRouteTitle } from '../lib/hooks';
 
@@ -21,17 +21,32 @@ export default function Engagements() {
             {engagements.items.map((item, index) => (
               <article key={item.key} className="engagement" data-reveal>
                 <div className="engagement__index" aria-hidden="true">
-                  {index + 1}
+                  0{index + 1}
                 </div>
                 <div className="engagement__body">
-                  <p className="eyebrow">{item.lead}</p>
+                  <div className="engagement__header">
+                    <p className="eyebrow">{item.lead}</p>
+                    <StatusStamp label={`Responsable : ${item.responsible}`} tone="neutral" />
+                  </div>
                   <h2>{item.name}</h2>
-                  {item.body.map((paragraph) => (
-                    <p key={paragraph}>{paragraph}</p>
-                  ))}
-                  <Link to={item.href} className="text-link">
-                    {item.action}
-                  </Link>
+
+                  <div className="engagement__clauses">
+                    <div className="engagement__clause engagement__clause--promise">
+                      <h3>Ce que le mouvement promet</h3>
+                      <p>{item.promise}</p>
+                    </div>
+
+                    <div className="engagement__clause engagement__clause--notyet">
+                      <h3>Ce qu’il ne promet pas encore</h3>
+                      <p>{item.notYet}</p>
+                    </div>
+                  </div>
+
+                  <div className="engagement__action">
+                    <Link to={item.href} className="text-link">
+                      {item.action}
+                    </Link>
+                  </div>
                 </div>
               </article>
             ))}
@@ -48,7 +63,7 @@ export default function Engagements() {
           />
           <p data-reveal>
             <Link to="/charte" className="text-link">
-              Lire la Charte
+              Lire la Charte complète
             </Link>
           </p>
         </Container>

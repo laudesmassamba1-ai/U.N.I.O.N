@@ -13,21 +13,32 @@ export function useDatabase(): DatabaseShape {
   return useSyncExternalStore(dbStore.subscribe, dbStore.getSnapshot, dbStore.getSnapshot);
 }
 
-export function useEditionSync(): void {
+export function useEditionSync(enabled = true, refreshKey = ''): void {
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
-    fetchRemoteEdition()
-      .then((document) => {
-        if (cancelled || !document) return;
-        if (document.revision <= getAppliedEditionRevision()) return;
-        dbStore.replace(mergeEdition(dbStore.getSnapshot(), document));
-        setAppliedEditionRevision(document.revision);
-      })
-      .catch(() => undefined);
+    const sync = () => {
+      fetchRemoteEdition()
+        .then((document) => {
+          if (cancelled || !document) return;
+          if (document.revision <= getAppliedEditionRevision()) return;
+          dbStore.replace(mergeEdition(dbStore.getSnapshot(), document));
+          setAppliedEditionRevision(document.revision);
+        })
+        .catch(() => undefined);
+    };
+    sync();
+    const timer = window.setInterval(sync, 60_000);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') sync();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, []);
+  }, [enabled, refreshKey]);
 }
 
 export interface RouteState {

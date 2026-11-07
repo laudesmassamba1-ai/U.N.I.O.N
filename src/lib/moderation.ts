@@ -13,6 +13,8 @@ export type ModerationCode =
 export interface ModerationResult {
   ok: boolean;
   code: ModerationCode | null;
+  flagged?: boolean;
+  flagReason?: string;
 }
 
 const urlPattern = /(https?:\/\/|www\.|[a-z0-9-]+\.(?:com|org|net|cd|cg|fr|io)\b)/i;
@@ -39,7 +41,7 @@ export function moderationMessage(code: ModerationCode): string {
     case 'link':
       return 'Les liens ne sont pas acceptés.';
     case 'hate':
-      return 'Ce texte contient des propos qui ne sont pas acceptés.';
+      return 'Ce texte contient des insultes ou des propos haineux qui ne sont pas acceptés.';
     case 'duplicate':
       return 'Cette suggestion a déjà été déposée.';
     default:
@@ -72,12 +74,12 @@ export function analyseSuggestion(input: {
   }
   if (urlPattern.test(text)) return { ok: false, code: 'link' };
   if (namePattern.test(text)) return { ok: false, code: 'personal' };
-  if (ethnonyms.some((term) => containsTerm(normalised, term))) {
-    return { ok: false, code: 'hate' };
-  }
+
+  // Hate markers are strictly refused at submission
   if (hateMarkers.some((term) => containsTerm(normalised, term))) {
     return { ok: false, code: 'hate' };
   }
+
   if (
     input.existingTexts?.some(
       (existing) => normaliseForComparison(existing) === normalised,
@@ -85,6 +87,13 @@ export function analyseSuggestion(input: {
   ) {
     return { ok: false, code: 'duplicate' };
   }
+
+  // Ethnonyms are flagged for human review in moderation queue rather than rejected on input
+  const foundEthnonym = ethnonyms.find((term) => containsTerm(normalised, term));
+  if (foundEthnonym) {
+    return { ok: true, code: null, flagged: true, flagReason: `ethnonyme: ${foundEthnonym}` };
+  }
+
   return { ok: true, code: null };
 }
 

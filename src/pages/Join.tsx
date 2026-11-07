@@ -14,15 +14,13 @@ export default function Join() {
         intro={joinPage.intro}
         breadcrumb={[{ label: 'Accueil', href: '/' }, { label: 'Rejoindre' }]}
       />
+
       <Section className="join" motion="rejoindre">
         <Container>
           <div className="join__grid">
             <div className="join__primary" data-reveal>
-              <h2>Le groupe WhatsApp</h2>
-              <p>
-                Le lien d’invitation est fourni par le fondateur. Il est conservé dans une
-                variable d’environnement du site.
-              </p>
+              <h2>{joinPage.primaryTitle}</h2>
+              <p>{joinPage.primaryText}</p>
               {site.whatsappUrl ? (
                 <ButtonLink href={site.whatsappUrl} external>
                   {joinPage.whatsapp}
@@ -30,8 +28,8 @@ export default function Join() {
               ) : (
                 <p className="note">{joinPage.unavailable}</p>
               )}
-              <p className="note">{joinPage.approvalNote}</p>
             </div>
+
             <div data-reveal>
               <h2>{joinPage.privacyTitle}</h2>
               <p>{joinPage.privacyText}</p>
@@ -41,9 +39,15 @@ export default function Join() {
                 </Link>
               </p>
             </div>
+
             <div data-reveal>
-              <h2>{joinPage.minimalTitle}</h2>
-              <p>{joinPage.minimalText}</p>
+              <h2>{joinPage.commitmentTitle}</h2>
+              <p>{joinPage.commitmentText}</p>
+              <p>
+                <Link to="/charte" className="text-link">
+                  Consulter la Charte
+                </Link>
+              </p>
             </div>
           </div>
         </Container>

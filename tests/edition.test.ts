@@ -147,7 +147,7 @@ describe('édition statique', () => {
     expect(() => parseEditionDocument(raw)).toThrow(/id/);
   });
 
-  it('applique une édition publique en gardant les suggestions locales en attente', () => {
+  it('applique une édition publique en gardant les suggestions en attente et les votes locaux', () => {
     const current = database({
       suggestions: [
         suggestion(),
@@ -166,8 +166,8 @@ describe('édition statique', () => {
       'suggestion-1',
     ]);
     expect(merged.suggestions[1]?.text).toBe('Texte publié à jour.');
-    expect(merged.votes).toEqual([]);
-    expect(merged.reports).toEqual([]);
+    expect(merged.votes).toHaveLength(1);
+    expect(merged.reports).toHaveLength(1);
   });
 
   it('applique une sauvegarde complète en remplaçant tout', () => {

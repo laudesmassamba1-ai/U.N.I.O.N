@@ -13,28 +13,29 @@ export default function Board() {
         intro={board.intro}
         breadcrumb={[{ label: 'Accueil', href: '/' }, { label: 'Le Bureau' }]}
       >
-        <StatusStamp label="Postes à confirmer" tone="attention" />
+        <StatusStamp label="En constitution" tone="attention" />
       </PageHeader>
 
       <Section className="board" motion="bureau">
         <Container>
+          <div className="board-notice-banner" data-reveal>
+            <p className="board-vacant-single">{board.vacantSingleLine}</p>
+          </div>
+
           <div className="board-diagram" data-reveal>
             <div className="board-diagram__president">
               <span className="board-diagram__role">Président National</span>
-              <span className="board-diagram__detail">Président-Fondateur, représentant légal</span>
-              <StatusBadge label={board.vacant} tone="neutral" />
+              <span className="board-diagram__detail">Représente le mouvement et préside le bureau</span>
             </div>
             <div className="board-diagram__line" aria-hidden="true" />
             <div className="board-diagram__vps">
               <div>
-                <span className="board-diagram__role">Vice-Président Nord</span>
-                <span className="board-diagram__detail">Mobilisation des départements du Nord</span>
-                <StatusBadge label={board.vacant} tone="neutral" />
+                <span className="board-diagram__role">Vice-Président chargé de la zone Nord</span>
+                <span className="board-diagram__detail">Coordination et mobilisation zone Nord</span>
               </div>
               <div>
-                <span className="board-diagram__role">Vice-Président Sud</span>
-                <span className="board-diagram__detail">Mobilisation des départements du Sud</span>
-                <StatusBadge label={board.vacant} tone="neutral" />
+                <span className="board-diagram__role">Vice-Président chargé de la zone Sud</span>
+                <span className="board-diagram__detail">Coordination et mobilisation zone Sud</span>
               </div>
             </div>
             <div className="board-diagram__line" aria-hidden="true" />
@@ -42,16 +43,14 @@ export default function Board() {
               <div>
                 <span className="board-diagram__role">Secrétaire Général</span>
                 <span className="board-diagram__detail">
-                  Administration, procès-verbaux, dossier au ministère
+                  Administration, procès-verbaux, suivi terrain
                 </span>
-                <StatusBadge label={board.vacant} tone="neutral" />
               </div>
               <div>
                 <span className="board-diagram__role">Trésorier Général</span>
                 <span className="board-diagram__detail">
-                  Cotisations et financement du programme
+                  Finances, gestion et publication des comptes
                 </span>
-                <StatusBadge label={board.vacant} tone="neutral" />
               </div>
             </div>
           </div>
@@ -59,6 +58,13 @@ export default function Board() {
           <div className="golden-rule" data-reveal>
             <p className="eyebrow">{board.goldenRuleTitle}</p>
             <p className="golden-rule__text">{board.goldenRule}</p>
+          </div>
+
+          <div className="board-zones" data-reveal>
+            <SectionHead eyebrow="Territoire" title={board.zonesTitle} />
+            <div className="board-zones__card">
+              <p className="lead">{board.zonesText}</p>
+            </div>
           </div>
         </Container>
       </Section>
@@ -71,7 +77,6 @@ export default function Board() {
               <article key={post.key} className="board-post" data-reveal>
                 <div className="board-post__head">
                   <h3>{post.title}</h3>
-                  <StatusBadge label={board.vacant} tone="neutral" />
                 </div>
                 <p className="board-post__detail">{post.detail}</p>
                 <p>{post.mission}</p>
