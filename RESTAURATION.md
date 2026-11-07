@@ -9,7 +9,7 @@ Objectif : remettre le site en ligne sur un projet Neon neuf **en moins d’une 
 - l’accès au Blob privé (`backups/`) et le jeton `BLOB_PRIVATE_READ_WRITE_TOKEN`, à garder hors du dépôt ;
 - un compte Neon et un projet vide, dans la même région que l’ancien.
 
-La clé privée ne doit jamais être copiée sur le serveur, dans GitHub, ni dans le dépôt.
+La clé privée de production ne doit jamais être copiée sur le serveur, dans GitHub, ni dans le dépôt. Le workflow mensuel utilise uniquement la paire de test dédiée : les sauvegardes sont chiffrées pour la clé de production **et** la clé de test.
 
 ## 1. Identifier la version du serveur
 

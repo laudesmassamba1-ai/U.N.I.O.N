@@ -52,7 +52,7 @@ Les éléments suivants ne peuvent pas être inventés. Tant qu’ils manquent, 
 - Chaîne de connexion « pooler » pour l’API, et chaîne d’un rôle **lecture seule** pour les sauvegardes.
 - Projet Vercel et domaine définitif.
 - Stockage Vercel Blob : `union-public` (instantané et images) et `union-backups` (dumps chiffrés) sont créés dans le projet Vercel, et le jeton privé est posé dans les secrets GitHub (`BLOB_PRIVATE_READ_WRITE_TOKEN`).
-- Paire de clés `age` : la clé publique est dans `.env.local` et doit être recopiée dans le secret GitHub `AGE_PUBLIC_KEY` ; la clé privée `data/backups/age/union.key` doit être déplacée hors ligne (gestionnaire de mots de passe et copie imprimée), jamais dans le dépôt.
+- Paires de clés `age` : la clé publique de production est dans `.env.local` et recopiée dans le secret GitHub `AGE_PUBLIC_KEY` ; sa clé privée `data/backups/age/union.key` doit être déplacée hors ligne (gestionnaire de mots de passe et copie imprimée), jamais dans le dépôt. Une paire de test dédiée est utilisée en plus : `AGE_TEST_PUBLIC_KEY` et `AGE_TEST_PRIVATE_KEY` sont des secrets GitHub, et chaque sauvegarde est chiffrée pour les deux destinataires. Le test mensuel ne peut donc jamais déchiffrer avec la clé de production.
 - `HEALTH_SECRET` généré, et décision sur la publication de la consommation mensuelle.
 - Confirmation du budget accepté (100 CU-heures) et du seuil de bascule vers l’écriture regroupée.
 

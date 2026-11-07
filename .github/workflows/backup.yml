@@ -20,6 +20,7 @@ jobs:
       DATABASE_URL_BACKUP_RO: ${{ secrets.DATABASE_URL_BACKUP_RO }}
       BLOB_PRIVATE_READ_WRITE_TOKEN: ${{ secrets.BLOB_PRIVATE_READ_WRITE_TOKEN }}
       AGE_PUBLIC_KEY: ${{ secrets.AGE_PUBLIC_KEY }}
+      AGE_TEST_PUBLIC_KEY: ${{ secrets.AGE_TEST_PUBLIC_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,7 +41,7 @@ jobs:
 
       - name: Vérifier les secrets
         run: |
-          for name in DATABASE_URL_BACKUP_RO BLOB_PRIVATE_READ_WRITE_TOKEN AGE_PUBLIC_KEY; do
+          for name in DATABASE_URL_BACKUP_RO BLOB_PRIVATE_READ_WRITE_TOKEN AGE_PUBLIC_KEY AGE_TEST_PUBLIC_KEY; do
             if [ -z "${!name}" ]; then
               echo "::error::$name manquant. Voir ENV.md."
               exit 1
@@ -80,7 +81,8 @@ jobs:
 
       - name: Chiffrer
         run: |
-          age --recipient "$AGE_PUBLIC_KEY" --output union.dump.age union.dump
+          age --recipient "$AGE_PUBLIC_KEY" --recipient "$AGE_TEST_PUBLIC_KEY" \
+            --output union.dump.age union.dump
           test -s union.dump.age
           sha256sum union.dump.age | cut -d' ' -f1 > sha256.txt
           stat -c%s union.dump.age > size.txt

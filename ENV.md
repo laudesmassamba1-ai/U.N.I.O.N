@@ -48,8 +48,9 @@ Trois lieux seulement : le navigateur au build, l’API sur Vercel, les workflow
 | --- | --- |
 | `DATABASE_URL_BACKUP_RO` | dump, comptage des lignes et journal `backup_log` |
 | `BLOB_PRIVATE_READ_WRITE_TOKEN` | accès au Blob privé des sauvegardes |
-| `AGE_PUBLIC_KEY` | chiffrement des sauvegardes |
-| `AGE_TEST_PRIVATE_KEY` | test mensuel de restauration, clé de test uniquement |
+| `AGE_PUBLIC_KEY` | destinataire de production des sauvegardes |
+| `AGE_TEST_PUBLIC_KEY` | second destinataire, pour le test de restauration |
+| `AGE_TEST_PRIVATE_KEY` | clé privée de test, utilisée uniquement par le test mensuel |
 | `HEALTH_SECRET` (variable) | contrôle de santé après déploiement, facultatif |
 | `VITE_DOSSIER_EMAILS` (variable) | transmise au build Pages |
 
