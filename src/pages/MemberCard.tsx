@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from '../components/Link';
 import { PageHeader } from '../components/Layout';
@@ -6,6 +6,7 @@ import { Container, Section, StatusStamp } from '../components/ui';
 import { departments, memberCardPage } from '../content/fr';
 import { api } from '../lib/api';
 import { useRouteTitle } from '../lib/hooks';
+import { buildDossierMailto, dossierRecipients } from '../lib/member-mail';
 
 interface CardResult {
   cardSent: boolean;
@@ -21,7 +22,14 @@ export default function MemberCard() {
   const [consent, setConsent] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   const [result, setResult] = useState<CardResult | null>(null);
+
+  const recipients = useMemo(() => dossierRecipients(), []);
+  const mailto = useMemo(
+    () => buildDossierMailto(recipients, { fullName: fullName.trim(), department: department || null }),
+    [recipients, fullName, department],
+  );
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -54,7 +62,9 @@ export default function MemberCard() {
       setDepartment('');
       setConsent(false);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : memberCardPage.errors.network);
+      const message = caught instanceof Error ? caught.message : '';
+      setError(message || memberCardPage.errors.network);
+      if (/HTTP (404|503)|fetch|network|réseau/i.test(message)) setUnavailable(true);
     } finally {
       setSubmitting(false);
     }
@@ -66,8 +76,28 @@ export default function MemberCard() {
         eyebrow={memberCardPage.eyebrow}
         title={memberCardPage.title}
         intro={memberCardPage.intro}
-        breadcrumb={[{ label: 'Accueil', href: '/' }, { label: 'Rejoindre', href: '/rejoindre' }, { label: 'Carte de membre' }]}
+        breadcrumb={[
+          { label: 'Accueil', href: '/' },
+          { label: 'Rejoindre', href: '/rejoindre' },
+          { label: 'Carte de membre' },
+        ]}
       />
+
+      <Section className="home-roadmap" motion="carte-etapes">
+        <Container>
+          <div className="roadmap-grid" data-reveal>
+            {memberCardPage.steps.map((step, index) => (
+              <div key={step.title} className="roadmap-step">
+                <div className="roadmap-step__header">
+                  <span className="roadmap-step__num">0{index + 1}</span>
+                </div>
+                <h3>{step.title}</h3>
+                <p>{step.text}</p>
+              </div>
+            ))}
+          </div>
+        </Container>
+      </Section>
 
       <Section className="join" motion="carte-de-membre">
         <Container>
@@ -163,6 +193,7 @@ export default function MemberCard() {
 
                     <div aria-live="polite">
                       {error ? <p className="form-error">{error}</p> : null}
+                      {unavailable ? <p className="note">{memberCardPage.serverUnavailable}</p> : null}
                     </div>
 
                     <button type="submit" className="button button--solid" disabled={submitting}>
@@ -174,6 +205,17 @@ export default function MemberCard() {
             </div>
 
             <div data-reveal>
+              <h2>{memberCardPage.mailTitle}</h2>
+              <p>{memberCardPage.mailText}</p>
+              {mailto ? (
+                <a className="button button--outline" href={mailto}>
+                  {memberCardPage.mailAction}
+                </a>
+              ) : (
+                <p className="note">{memberCardPage.mailUnavailable}</p>
+              )}
+              <p className="note">{memberCardPage.mailNote}</p>
+
               <h2>{memberCardPage.privacyTitle}</h2>
               <p>{memberCardPage.privacyNote}</p>
               <p>

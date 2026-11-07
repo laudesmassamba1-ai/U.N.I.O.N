@@ -486,6 +486,30 @@ export const memberCardPage = {
   title: 'Recevoir sa carte de membre',
   intro:
     'Indiquez votre nom et votre adresse e-mail. Votre dossier part au bureau et votre carte vous est envoyée à cette adresse.',
+  steps: [
+    {
+      title: 'Vous remplissez',
+      text: 'Nom, adresse e-mail, département facultatif, accord explicite.',
+    },
+    {
+      title: 'Le bureau reçoit',
+      text: 'Le dossier part sur les deux boîtes du bureau, avec votre demande complète.',
+    },
+    {
+      title: 'Vous recevez la carte',
+      text: 'La carte arrive à l’adresse indiquée, avec son numéro et la date de délivrance.',
+    },
+  ],
+  mailTitle: 'Envoyer le dossier depuis votre messagerie',
+  mailText:
+    'Ce chemin fonctionne même quand le site n’a pas de serveur : votre logiciel de messagerie s’ouvre avec le dossier déjà rempli, adressé aux deux boîtes du bureau. Le message part de votre propre adresse.',
+  mailAction: 'Ouvrir ma messagerie',
+  mailNote:
+    'Le site ne peut pas vérifier cet envoi : c’est vous qui appuyez sur « Envoyer ». Le bureau traite ensuite la demande depuis sa boîte.',
+  mailUnavailable:
+    'L’envoi depuis la messagerie n’est pas configuré sur ce site. Utilisez le formulaire.',
+  serverUnavailable:
+    'L’envoi automatique n’est pas disponible sur cette version du site. Utilisez l’envoi depuis votre messagerie, plus bas.',
   formTitle: 'Demande de carte',
   formHelp:
     'Le nom, l’adresse e-mail et le département servent uniquement à établir la carte et à transmettre le dossier au bureau.',
@@ -672,6 +696,7 @@ export const privacyPage = {
       body: [
         'Le nom, l’adresse e-mail et le département servent à transmettre votre dossier au bureau et à vous envoyer votre carte.',
         'Le dossier part au bureau par e-mail. La carte part à l’adresse que vous indiquez. Le prestataire d’envoi reçoit ces informations pour effectuer la livraison.',
+        'Si vous envoyez le dossier depuis votre messagerie, le message part de votre propre adresse et le site ne voit pas son contenu.',
         'Le serveur conserve ces informations douze mois au maximum. Aucune donnée de membre n’est publiée sur le site. Le département reste facultatif.',
       ],
     },

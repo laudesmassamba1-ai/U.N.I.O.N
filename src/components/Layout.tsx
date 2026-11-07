@@ -11,6 +11,7 @@ const primary = [
   { href: '/', label: 'Accueil' },
   { href: '/journal', label: 'Le journal' },
   { href: '/suggestions', label: 'Suggestions' },
+  { href: '/carte', label: 'Carte de membre' },
 ] as const;
 
 const movementLinks = [

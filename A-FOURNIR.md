@@ -35,6 +35,7 @@ Les éléments suivants ne peuvent pas être inventés. Tant qu’ils manquent, 
 - Validation des mentions imprimées sur la carte (numéro, devise, statut du mouvement).
 - Durée de conservation retenue par le bureau (douze mois dans le code actuel).
 - Base légale et information des personnes pour ce traitement, à faire relire par un juriste congolais.
+- Pour que le lien de messagerie apparaisse dans le site statique, définir `VITE_DOSSIER_EMAILS` dans l’environnement de construction (variable de dépôt, pas dans le code). Sans elle, seul le formulaire serveur reste actif.
 
 ## Langues
 
