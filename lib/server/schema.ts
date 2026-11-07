@@ -1,4 +1,6 @@
+import { sql } from 'drizzle-orm';
 import {
+  check,
   index,
   integer,
   pgTable,
@@ -31,6 +33,8 @@ export const articles = pgTable(
     deletedAt: text('deleted_at'),
   },
   (table) => [
+    check('articles_status_check', sql`${table.status} in ('draft', 'published', 'archived')`),
+    check('articles_nature_check', sql`${table.nature} in ('info', 'analyse', 'opinion')`),
     index('articles_status_published_idx').on(table.status, table.publishedAt),
     index('articles_updated_at_idx').on(table.updatedAt),
   ],
@@ -88,6 +92,14 @@ export const suggestions = pgTable(
     archivedAt: text('archived_at'),
   },
   (table) => [
+    check(
+      'suggestions_text_length_check',
+      sql`char_length(${table.text}) between 20 and 600`,
+    ),
+    check(
+      'suggestions_status_check',
+      sql`${table.status} in ('pending', 'discussion', 'retained', 'adapted', 'integrated', 'archived', 'expired', 'hidden')`,
+    ),
     index('suggestions_status_created_idx').on(table.status, table.createdAt),
     index('suggestions_created_at_idx').on(table.createdAt),
   ],
@@ -107,6 +119,7 @@ export const suggestionVotes = pgTable(
   },
   (table) => [
     uniqueIndex('suggestion_votes_unique_idx').on(table.suggestionId, table.voterHash),
+    check('suggestion_votes_value_check', sql`${table.value} in ('useful', 'not_useful')`),
     index('suggestion_votes_suggestion_value_idx').on(table.suggestionId, table.value),
   ],
 );
@@ -208,4 +221,14 @@ export const backupLog = pgTable(
     destination: text('destination'),
   },
   (table) => [index('backup_log_created_at_idx').on(table.createdAt)],
+);
+
+export const snapshotMeta = pgTable(
+  'snapshot_meta',
+  {
+    id: integer('id').primaryKey(),
+    builtAt: text('built_at').notNull(),
+    etag: text('etag').notNull(),
+  },
+  (table) => [check('snapshot_meta_single_row_check', sql`${table.id} = 1`)],
 );

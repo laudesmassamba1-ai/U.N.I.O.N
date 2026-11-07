@@ -8,9 +8,9 @@ Il présente le mouvement, la Charte, le Bureau, les engagements, les 12 départ
 Le site public est une application Vite + React. Un serveur HTTP fournit l’API `/api/v1` et sert la même application en développement.
 
 - Les articles, suggestions, votes, signalements, réglages et entrées d’audit sont lus et écrits côté serveur.
-- Le Studio utilise une session signée HMAC, un cookie `HttpOnly` `SameSite=Strict` et le secret `STUDIO_SECRET`.
+- Le Studio utilise une session signée HMAC, un cookie `HttpOnly` `SameSite=Strict` et `SESSION_SECRET` (ancien nom accepté : `STUDIO_SECRET`).
 - `public/data/edition.json` reste un secours statique en lecture seule lorsque l’API est indisponible.
-- En développement, la base est SQLite via `node:sqlite` dans `data/union.sqlite`.
+- En développement et en test, la base est PGlite (PostgreSQL en mémoire ou dans `data/pglite`). En production, le serveur utilise PostgreSQL sur Neon avec des rôles limités.
 
 Le serveur est la source de vérité : une suggestion, un vote ou une publication n’est confirmé à l’écran qu’après une réponse serveur réussie.
 
@@ -30,9 +30,10 @@ Le site est servi sur `http://localhost:3000`.
 
 | Variable | Rôle |
 | --- | --- |
-| `STUDIO_SECRET` | Obligatoire pour ouvrir une session Studio. 16 caractères minimum. Ne jamais exposer avec un préfixe `VITE_`. |
-| `VOTE_SECRET` | Secret HMAC des empreintes de vote. 32 caractères minimum. Obligatoire en production, sinon l’API refuse les votes avec un code 503. |
-| `DATABASE_PATH` | Chemin de la base SQLite. Par défaut `data/union.sqlite`. |
+| `SESSION_SECRET` | Obligatoire pour ouvrir une session Studio. 32 caractères minimum. `STUDIO_SECRET` reste accepté (16 caractères minimum). Ne jamais exposer avec un préfixe `VITE_`. |
+| `VOTE_HMAC_SECRET` | Secret HMAC des empreintes de vote. 32 caractères minimum. `VOTE_SECRET` reste accepté. Obligatoire en production, sinon l’API refuse les votes avec un code 503. |
+| `DATABASE_URL_APP`, `DATABASE_URL_STUDIO`, `DATABASE_URL_BACKUP_RO` | Chaînes Neon limitées par rôle. `DATABASE_URL` propriétaire sert uniquement aux migrations. |
+| `PGLITE_PATH` | Chemin de la base PGlite locale. Par défaut `data/pglite` ; `PGLITE_MEMORY=1` force la mémoire. |
 | `VITE_SITE_URL` | Origine publique absolue, sans slash final. Sert à l’image Open Graph et au partage. Remplacer par le domaine définitif. |
 | `VITE_WHATSAPP_URL` | Lien d’invitation au groupe WhatsApp. Vide : les boutons sont masqués. |
 | `VITE_UNION_EMAIL` | Adresse e-mail publique, publiée uniquement si elle a été validée. |
@@ -73,9 +74,9 @@ Les routes Studio exigent la session serveur. Les suggestions anonymes exigent u
 
 ## Déploiement
 
-Le fichier `vercel.json` route l’API vers `api/index.ts`. SQLite n’est pas un stockage persistant sur Vercel : une base PostgreSQL et un adaptateur dédié restent à ajouter avant une mise en production sur cette plateforme.
+Le fichier `vercel.json` route toutes les requêtes `/api/*` vers `api/[...path].ts` et planifie `/api/cron/daily`. La production utilise PostgreSQL sur Neon, avec `DATABASE_URL_APP` pour l’API et `DATABASE_URL_STUDIO` pour le Studio. Le déploiement Vercel et la création des seaux R2 restent à faire.
 
-Il faut aussi fournir `STUDIO_SECRET`, `VOTE_SECRET` et un stockage partagé. Sans cela, le site peut être consulté, mais le Studio et les écritures ne doivent pas être considérés comme prêts pour la production.
+Il faut aussi fournir `SESSION_SECRET`, `VOTE_HMAC_SECRET` et un stockage d’objets. Sans cela, le site peut être consulté, mais le Studio et les écritures ne doivent pas être considérés comme prêts pour la production.
 
 ## Vérifications
 
@@ -93,7 +94,7 @@ Les garde-fous vérifient le logo, le vocabulaire interdit, la vie privée, les 
 - `src/content/notes-internes.ts` : notes d’équipe, masquées par défaut.
 - `src/types.ts` : modèle de données.
 - `src/lib/` : API cliente, stockage local, édition JSON, dates, identifiants, chiffrement, suggestions, modération.
-- `server/` : API, base SQLite, sessions, validation.
+- `server/` : API, accès PostgreSQL/PGlite, sessions, validation.
 - `api/index.ts` : point d’entrée Vercel.
 - `public/data/edition.json` : secours statique en lecture seule.
 - `scripts/` : garde-fous et publication de l’édition de secours.

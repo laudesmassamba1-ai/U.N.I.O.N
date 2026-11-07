@@ -31,6 +31,7 @@ describe('schéma PostgreSQL', () => {
       'audit_log',
       'backup_log',
       'media',
+      'members',
       'reports',
       'roadmap',
       'settings',
@@ -44,28 +45,30 @@ describe('schéma PostgreSQL', () => {
 
   it('refuse un texte de suggestion hors bornes', { timeout: 20_000 }, async () => {
     await expect(
-      db.query("insert into suggestions (id, text, category) values ('court', 'trop court', 'Jeunesse')"),
+      db.query(
+        "insert into suggestions (id, text, category, created_at, updated_at) values ('court', 'trop court', 'Jeunesse', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')",
+      ),
     ).rejects.toThrow();
   });
 
   it('refuse deux votes du même jeton sur la même suggestion', async () => {
     await db.query(
-      "insert into suggestions (id, text, category, status) values ('s1', 'Une suggestion assez longue pour passer la contrainte.', 'Jeunesse', 'discussion')",
+      "insert into suggestions (id, text, category, status, created_at, updated_at) values ('s1', 'Une suggestion assez longue pour passer la contrainte.', 'Jeunesse', 'discussion', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')",
     );
     await db.query(
-      "insert into suggestion_votes (suggestion_id, voter_hash, value) values ('s1', 'hash-1', 1)",
+      "insert into suggestion_votes (id, suggestion_id, voter_hash, value, created_at, updated_at) values ('v1', 's1', 'hash-1', 'useful', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')",
     );
     await expect(
       db.query(
-        "insert into suggestion_votes (suggestion_id, voter_hash, value) values ('s1', 'hash-1', -1)",
+        "insert into suggestion_votes (id, suggestion_id, voter_hash, value, created_at, updated_at) values ('v2', 's1', 'hash-1', 'not_useful', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')",
       ),
     ).rejects.toThrow();
   });
 
-  it('refuse une valeur de vote hors -1 et 1', async () => {
+  it('refuse une valeur de vote hors useful et not_useful', async () => {
     await expect(
       db.query(
-        "insert into suggestion_votes (suggestion_id, voter_hash, value) values ('s1', 'hash-2', 0)",
+        "insert into suggestion_votes (id, suggestion_id, voter_hash, value, created_at, updated_at) values ('v3', 's1', 'hash-2', 'maybe', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')",
       ),
     ).rejects.toThrow();
   });
@@ -83,9 +86,9 @@ describe('schéma PostgreSQL', () => {
   });
 
   it('impose une seule ligne d’instantané', async () => {
-    await db.query("insert into snapshot_meta (id, built_at, etag) values (1, now(), 'e')");
+    await db.query("insert into snapshot_meta (id, built_at, etag) values (1, '2026-01-01T00:00:00.000Z', 'e')");
     await expect(
-      db.query("insert into snapshot_meta (id, built_at, etag) values (2, now(), 'e')"),
+      db.query("insert into snapshot_meta (id, built_at, etag) values (2, '2026-01-01T00:00:00.000Z', 'e')"),
     ).rejects.toThrow();
   });
 });

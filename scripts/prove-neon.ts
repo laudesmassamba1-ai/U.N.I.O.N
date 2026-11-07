@@ -40,8 +40,8 @@ async function main(): Promise<void> {
   console.log(`1. select 1 : ${ping[0]?.ok === 1 ? 'ok' : 'échec'}`);
 
   const tables = (await app`
-    select table_name from information_schema.tables
-    where table_schema = 'public' order by table_name
+    select tablename as table_name from pg_tables
+    where schemaname = 'public' order by tablename
   `) as Array<{ table_name: string }>;
   const expected = [
     'article_revisions',
@@ -49,6 +49,7 @@ async function main(): Promise<void> {
     'audit_log',
     'backup_log',
     'media',
+    'members',
     'reports',
     'roadmap',
     'settings',
@@ -64,41 +65,50 @@ async function main(): Promise<void> {
   if (missing.length > 0) throw new Error('Migrations incomplètes.');
 
   await app`
-    insert into suggestions (id, text, category, status)
-    values (${suggestionId}, ${text}, 'Jeunesse', 'pending')
+    insert into suggestions (id, text, category, status, created_at, updated_at)
+    values (${suggestionId}, ${text}, 'Jeunesse', 'pending', now()::text, now()::text)
   `;
   await studio`
-    update suggestions set status = 'discussion', published_at = now(), status_changed_at = now()
+    update suggestions set status = 'discussion', published_at = now()::text
     where id = ${suggestionId}
   `;
   console.log('3. dépôt puis publication : ok');
 
   for (const [index, token] of voters.entries()) {
-    const value = index === 0 ? 1 : -1;
+    const value = index === 0 ? 'useful' : 'not_useful';
     const hash = voterHash(token);
     await app`
-      insert into suggestion_votes (suggestion_id, voter_hash, value)
-      values (${suggestionId}, ${hash}, ${value})
+      insert into suggestion_votes (id, suggestion_id, voter_hash, value, created_at, updated_at)
+      values (${`vote-${ulid()}`}, ${suggestionId}, ${hash}, ${value}, now()::text, now()::text)
       on conflict (suggestion_id, voter_hash) do update
-      set value = excluded.value, updated_at = now()
+      set value = excluded.value, updated_at = now()::text
     `;
   }
-  const counters = (await app`
-    select useful_count, not_useful_count from suggestions where id = ${suggestionId}
-  `) as Array<{ useful_count: number; not_useful_count: number }>;
-  console.log(
-    `4. deux votes : utiles ${counters[0]?.useful_count ?? '?'}, inutiles ${counters[0]?.not_useful_count ?? '?'}`,
-  );
-  if (counters[0]?.useful_count !== 0 || counters[0]?.not_useful_count !== 0) {
-    console.log('   (compteurs mis à jour par la route applicative, pas par ce script)');
-  }
+  const votes = (await app`
+    select value from suggestion_votes where suggestion_id = ${suggestionId} order by value
+  `) as Array<{ value: string }>;
+  console.log(`4. deux votes : ${votes.length} ligne(s), valeurs ${votes.map((row) => row.value).join(', ') || 'aucune'}`);
+  if (votes.length !== 2) throw new Error('Votes non enregistrés.');
+
+  const previousSnapshot = (await app`
+    select built_at, etag from snapshot_meta where id = 1
+  `) as Array<{ built_at: string; etag: string }>;
 
   await app`
     insert into snapshot_meta (id, built_at, etag)
-    values (1, now(), ${`prove-${Date.now()}`})
-    on conflict (id) do update set built_at = now(), etag = excluded.etag
+    values (1, now()::text, ${`prove-${Date.now()}`})
+    on conflict (id) do update set built_at = now()::text, etag = excluded.etag
   `;
   console.log('5. snapshot_meta : ok');
+
+  if (previousSnapshot.length === 0) {
+    await studio`delete from snapshot_meta where id = 1`;
+  } else {
+    await studio`
+      update snapshot_meta set built_at = ${previousSnapshot[0].built_at}, etag = ${previousSnapshot[0].etag}
+      where id = 1
+    `;
+  }
 
   await studio`delete from suggestions where id = ${suggestionId}`;
   const remaining = (await app`

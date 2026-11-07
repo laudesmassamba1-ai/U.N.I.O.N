@@ -73,10 +73,10 @@ Pour un article publié, le texte alternatif, la légende et le crédit sont obl
 
 ## 8. Limites honnêtes
 
-- SQLite convient au développement. Vercel exige un stockage partagé et persistant, par exemple PostgreSQL avec un adaptateur à écrire.
+- PGlite convient au développement et aux tests. Vercel exige un stockage partagé et persistant : la production utilise PostgreSQL sur Neon, avec des routes serverless encore à déployer.
 - Le fichier de secours est public. Ne jamais y placer de brouillon, de note interne, de donnée personnelle ou de journal d’audit.
-- Le Studio dépend de `STUDIO_SECRET`. Sans ce secret, aucune session ne peut être ouverte.
-- Les votes exigent `VOTE_SECRET` (32 caractères minimum) en production. Sans ce secret, l’API refuse les votes avec un code 503 au lieu de perdre l’unicité des empreintes.
+- Le Studio dépend de `SESSION_SECRET` (ou de l’ancien `STUDIO_SECRET`). Sans ce secret, aucune session ne peut être ouverte.
+- Les votes exigent `VOTE_HMAC_SECRET` (32 caractères minimum ; `VOTE_SECRET` reste accepté) en production. Sans ce secret, l’API refuse les votes avec un code 503 au lieu de perdre l’unicité des empreintes.
 - Les votes et signalements ne sont partagés entre visiteurs que lorsque l’API et la base sont disponibles.
 
 ## 9. Vérifier le fichier

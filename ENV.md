@@ -17,8 +17,10 @@ Trois lieux seulement : le navigateur au build, l’API sur Vercel, les workflow
 
 | Variable | Rôle | Secret |
 | --- | --- | --- |
-| `STUDIO_SECRET` | ouverture du Studio, 16 caractères minimum | oui |
-| `VOTE_SECRET` | empreinte HMAC des votes, 32 caractères minimum | oui |
+| `SESSION_SECRET` | ouverture du Studio, 32 caractères minimum | oui |
+| `STUDIO_SECRET` | ancien nom accepté, 16 caractères minimum | oui |
+| `VOTE_HMAC_SECRET` | empreinte HMAC des votes, 32 caractères minimum | oui |
+| `VOTE_SECRET` | ancien nom accepté, 32 caractères minimum | oui |
 | `HEALTH_SECRET` | sonde profonde `?deep=1` | oui |
 | `MEMBER_DOSSIER_EMAILS` | boîtes qui reçoivent les dossiers de membre | oui |
 | `MAIL_API_KEY` | clé du service d’envoi | oui |
@@ -29,24 +31,21 @@ Trois lieux seulement : le navigateur au build, l’API sur Vercel, les workflow
 | `DATABASE_URL_APP` | pooler, rôle `app_public`, API publique | oui |
 | `DATABASE_URL_STUDIO` | pooler, rôle `app_studio`, Studio | oui |
 | `DATABASE_URL_BACKUP_RO` | direct, rôle `backup_ro`, GitHub Actions seulement | oui |
-| `VOTE_HMAC_SECRET` | empreinte des jetons de vote | oui |
-| `SESSION_SECRET` | signature des sessions du Studio | oui |
 | `REVALIDATE_SECRET`, `CRON_SECRET` | appels internes et tâche planifiée | oui |
 | `OBJECT_STORE_*` | endpoint, seau, clés, URL publique | oui |
 | `BACKUP_AGE_PUBLIC_KEY` | chiffrement des sauvegardes | non (clé publique) |
 | `PUBLIC_SITE_URL` | URL absolue du site | non |
-| `DATABASE_URL_READONLY` | ancien nom du rôle lecture seule (workflows actuels) | oui |
 | `SNAPSHOT_URL` | objet public de l’instantané | non |
-| `SNAPSHOT_WRITE_URL` | URL de put signée pour publier l’instantané | oui |
+| `SNAPSHOT_WRITE_URL` | URL de put signée de repli ; l’écriture normale passe par `OBJECT_STORE_*` | oui |
+| `SNAPSHOT_KEY` | clé de l’objet dans le seau public, `edition.json` par défaut | non |
 | `SNAPSHOT_PATH` | fichier local de développement | non |
-| `HEALTH_SECRET` | voir ci-dessus | oui |
 | `WRITE_MODE` | `direct` (défaut) ou `buffered` (réservé) | non |
 
 ## Workflows GitHub (Secrets and variables)
 
 | Nom | Rôle |
 | --- | --- |
-| `DATABASE_URL_READONLY` | dump et comptage des lignes |
+| `DATABASE_URL_BACKUP_RO` | dump, comptage des lignes et journal `backup_log` |
 | `BACKUP_S3_ENDPOINT`, `BACKUP_S3_BUCKET` | destination des sauvegardes |
 | `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY` | accès au compartiment privé |
 | `AGE_PUBLIC_KEY` | chiffrement des sauvegardes |

@@ -12,8 +12,12 @@ const serverEnvSchema = z.object({
   DATABASE_URL_APP: z.string().min(1).optional(),
   DATABASE_URL_STUDIO: z.string().min(1).optional(),
   DATABASE_URL_BACKUP_RO: z.string().min(1).optional(),
+  DATABASE_URL_BACKUP_WRITER: z.string().min(1).optional(),
   VOTE_HMAC_SECRET: z.string().min(32).optional(),
+  VOTE_SECRET: z.string().min(32).optional(),
   SESSION_SECRET: z.string().min(32).optional(),
+  STUDIO_SECRET: z.string().min(16).optional(),
+  HEALTH_SECRET: z.string().min(16).optional(),
   REVALIDATE_SECRET: z.string().min(16).optional(),
   CRON_SECRET: z.string().min(16).optional(),
   OBJECT_STORE_ENDPOINT: z.string().url().optional(),
@@ -23,6 +27,11 @@ const serverEnvSchema = z.object({
   OBJECT_STORE_PUBLIC_URL: z.string().url().optional(),
   BACKUP_AGE_PUBLIC_KEY: z.string().min(1).optional(),
   PUBLIC_SITE_URL: z.string().url().optional(),
+  SNAPSHOT_URL: z.string().url().optional(),
+  SNAPSHOT_WRITE_URL: z.string().url().optional(),
+  SNAPSHOT_KEY: z.string().min(1).optional(),
+  SNAPSHOT_PATH: z.string().min(1).optional(),
+  WRITE_MODE: z.enum(['direct', 'buffered']).optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

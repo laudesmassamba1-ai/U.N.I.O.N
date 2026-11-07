@@ -1,9 +1,9 @@
 /**
  * Résilience de la base : réveil, quota, contraintes.
  *
- * Ces primitives ne dépendent d’aucun moteur. Le serveur actuel utilise SQLite ;
- * les motifs couvrent aussi les codes PostgreSQL et Neon pour que le passage au
- * pilote serverless ne change pas les appelants.
+ * Ces primitives ne dépendent d’aucun moteur. Le serveur utilise PostgreSQL sur
+ * Neon en production et PGlite en développement/test ; les motifs couvrent les
+ * erreurs des deux pilotes.
  */
 
 export type DbFailureKind = 'validation' | 'constraint' | 'quota' | 'wake' | 'unknown';

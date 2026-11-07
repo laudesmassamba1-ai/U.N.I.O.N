@@ -68,16 +68,20 @@ export function checkMemberRateLimit(clientIdentifier: string): {
 // Vote Token Anonymization: Server-side HMAC secret
 const fallbackVoteSecret = crypto.randomBytes(32).toString('hex');
 
+function voteSecret(): string | undefined {
+  return process.env.VOTE_HMAC_SECRET || process.env.VOTE_SECRET;
+}
+
 export function isVoteConfigured(): boolean {
-  const secret = process.env.VOTE_SECRET;
+  const secret = voteSecret();
   return Boolean(secret && secret.length >= 32);
 }
 
 function getVoteSecret(): string {
-  const secret = process.env.VOTE_SECRET;
+  const secret = voteSecret();
   if (secret && secret.length >= 32) return secret;
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('VOTE_SECRET manquant ou trop court (32 caractères minimum).');
+    throw new Error('VOTE_HMAC_SECRET ou VOTE_SECRET manquant ou trop court (32 caractères minimum).');
   }
   return fallbackVoteSecret;
 }
@@ -113,18 +117,30 @@ const SESSION_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 const revokedSessions = new Set<string>();
 let testFallbackSecret: string | null = null;
 
+function studioSecret(): string | undefined {
+  const session = process.env.SESSION_SECRET;
+  if (session && session.length >= 32) return session;
+  return process.env.STUDIO_SECRET;
+}
+
 export function isStudioConfigured(): boolean {
-  return Boolean(process.env.STUDIO_SECRET && process.env.STUDIO_SECRET.length >= 16);
+  const secret = studioSecret();
+  return Boolean(secret && secret.length >= 16);
+}
+
+export function getStudioLoginSecret(): string | null {
+  const secret = studioSecret();
+  return secret && secret.length >= 16 ? secret : null;
 }
 
 function getStudioSecret(): string {
-  const secret = process.env.STUDIO_SECRET;
+  const secret = studioSecret();
   if (secret && secret.length >= 16) return secret;
   if (process.env.NODE_ENV === 'test') {
     testFallbackSecret ??= crypto.randomBytes(32).toString('hex');
     return testFallbackSecret;
   }
-  throw new Error('STUDIO_SECRET manquant ou trop court (16 caractères minimum).');
+  throw new Error('SESSION_SECRET ou STUDIO_SECRET manquant ou trop court (16 caractères minimum).');
 }
 
 function sign(payload: string): string {

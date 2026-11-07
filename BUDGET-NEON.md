@@ -61,4 +61,4 @@ Si, **avant le 20 du mois**, la consommation dépasse 60 % du quota :
 
 ## Coût des tests et de l’intégration continue
 
-Les tests utilisent SQLite en mémoire (`node:sqlite`), pas Neon. Aucune heure de calcul n’est consommée par `pnpm test` ni par GitHub Actions. PGlite n’est pas installé à ce jour.
+Les tests utilisent PGlite en mémoire, pas Neon. Aucune heure de calcul n’est consommée par `pnpm test` ni par GitHub Actions.

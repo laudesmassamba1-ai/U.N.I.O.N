@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      DATABASE_URL_READONLY: ${{ secrets.DATABASE_URL_READONLY }}
+      DATABASE_URL_BACKUP_RO: ${{ secrets.DATABASE_URL_BACKUP_RO }}
       BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
       BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
       BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
@@ -29,7 +29,7 @@ jobs:
     steps:
       - name: Vérifier les secrets
         run: |
-          for name in DATABASE_URL_READONLY BACKUP_S3_ENDPOINT BACKUP_S3_BUCKET \
+          for name in DATABASE_URL_BACKUP_RO BACKUP_S3_ENDPOINT BACKUP_S3_BUCKET \
             BACKUP_S3_ACCESS_KEY_ID BACKUP_S3_SECRET_ACCESS_KEY AGE_PUBLIC_KEY; do
             if [ -z "${!name}" ]; then
               echo "::error::$name manquant. Voir ENV.md."
@@ -51,7 +51,7 @@ jobs:
 
       - name: Compter les lignes
         run: |
-          psql "$DATABASE_URL_READONLY" -At -v ON_ERROR_STOP=1 -c "
+          psql "$DATABASE_URL_BACKUP_RO" -At -v ON_ERROR_STOP=1 -c "
             SELECT json_build_object(
               'articles', (SELECT count(*) FROM articles),
               'suggestions', (SELECT count(*) FROM suggestions),
@@ -63,7 +63,7 @@ jobs:
 
       - name: Dump
         run: |
-          pg_dump "$DATABASE_URL_READONLY" \
+          pg_dump "$DATABASE_URL_BACKUP_RO" \
             --format=custom --no-owner --no-privileges \
             --file=union.dump
           test -s union.dump
@@ -91,7 +91,7 @@ jobs:
           sha="$(cat sha256.txt)"
           size="$(cat size.txt)"
           counts="$(cat counts.json)"
-          psql "$DATABASE_URL_READONLY" -v ON_ERROR_STOP=1 -c "
+          psql "$DATABASE_URL_BACKUP_RO" -v ON_ERROR_STOP=1 -c "
             INSERT INTO backup_log (id, created_at, size_bytes, sha256, row_counts, destination)
             VALUES (
               'backup-$stamp',

@@ -5,7 +5,7 @@ Objectif : remettre le site en ligne sur un projet Neon neuf **en moins d’une 
 ## Ce qu’il faut avoir
 
 - un ordinateur avec `age`, `psql` et `pg_restore` (version majeure identique au serveur) ;
-- la clé privée `age` du fondateur, conservée hors ligne (gestionnaire de mots de passe et copie imprimée) ;
+- la clé privée `age` du fondateur, conservée hors ligne (gestionnaire de mots de passe et copie imprimée). La paire générée localement se trouve dans `data/backups/age/` (ignoré par Git) : déplacer `union.key` hors ligne après copie, ne jamais la versionner ;
 - l’accès au compartiment de sauvegarde (`backups/`) ;
 - un compte Neon et un projet vide, dans la même région que l’ancien.
 
@@ -14,7 +14,7 @@ La clé privée ne doit jamais être copiée sur le serveur, dans GitHub, ni dan
 ## 1. Identifier la version du serveur
 
 ```bash
-psql "$DATABASE_URL_READONLY" -Atc "SHOW server_version;"
+psql "$DATABASE_URL_BACKUP_RO" -Atc "SHOW server_version;"
 ```
 
 Exemple : `16.4`. Installez la même version majeure du client.
@@ -33,7 +33,7 @@ sha256sum union-AAAA-MM-JJ.dump.age
 Comparez l’empreinte à celle écrite dans `backup_log` (Studio → Santé, ou requête ci-dessous) :
 
 ```bash
-psql "$DATABASE_URL_READONLY" -c \
+psql "$DATABASE_URL_BACKUP_RO" -c \
   "SELECT created_at, size_bytes, sha256 FROM backup_log ORDER BY created_at DESC LIMIT 1;"
 ```
 

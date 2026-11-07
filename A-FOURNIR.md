@@ -1,6 +1,6 @@
 # Informations à fournir par le bureau
 
-> **Avant toute mise en ligne publique :** changer le mot de passe de `neondb_owner` (console Neon, Roles & Databases, Reset password), puis mettre à jour `.env.local` et les variables Vercel. Ce mot de passe a été vu dans une conversation. Poser ensuite `OWNER_PASSWORD_ROTATED=true` dans `.env.local` : tant que la variable est absente, `pnpm check-secrets` rappelle la consigne à chaque exécution.
+> **Rotation faite le 7 novembre 2026 :** le mot de passe `neondb_owner` exposé a été remplacé et `OWNER_PASSWORD_ROTATED=true` est posé dans `.env.local`. La nouvelle valeur reste dans `.env.local` ; lors de la création du projet Vercel, la reporter dans les variables du projet, jamais dans un fichier suivi.
 
 Les éléments suivants ne peuvent pas être inventés. Tant qu’ils manquent, le site affiche un texte d’attente explicite.
 
@@ -13,7 +13,7 @@ Les éléments suivants ne peuvent pas être inventés. Tant qu’ils manquent, 
 - Adresse du siège, si elle est publique.
 - Nom de domaine et hébergeur définitifs.
 - Accès à une base PostgreSQL persistante pour la production, et validation du mode de déploiement.
-- Connexion Neon autorisée (`neon login`) ou chaînes de connexion déposées directement dans `.env.local`, jamais dans la conversation.
+- Rotation du mot de passe propriétaire Neon faite dans `.env.local` ; reste à la reporter dans les variables Vercel. Les chaînes limitées sont déjà déposées dans `.env.local`, jamais dans la conversation.
 - Projet Vercel et domaine définitif.
 - Secrets de production `STUDIO_SECRET` et `VOTE_SECRET`, générés puis conservés hors du dépôt.
 
@@ -51,8 +51,8 @@ Les éléments suivants ne peuvent pas être inventés. Tant qu’ils manquent, 
 - Compte Neon et région choisie, identique à celle des fonctions Vercel.
 - Chaîne de connexion « pooler » pour l’API, et chaîne d’un rôle **lecture seule** pour les sauvegardes.
 - Projet Vercel et domaine définitif.
-- Compte de stockage compatible S3 (R2 ou B2), compartiment public pour l’instantané et les images, compartiment privé pour `backups/`, avec une URL de put signée.
-- Paire de clés `age` : la clé publique dans les secrets GitHub, la clé privée hors ligne chez le fondateur, jamais dans le dépôt.
+- Compte Cloudflare R2 avec un jeton S3 : seau public `union-public` (instantané et images, domaine personnalisé), seau privé `union-backups` (dumps chiffrés).
+- Paire de clés `age` : la clé publique est dans `.env.local` et doit être recopiée dans le secret GitHub `AGE_PUBLIC_KEY` ; la clé privée `data/backups/age/union.key` doit être déplacée hors ligne (gestionnaire de mots de passe et copie imprimée), jamais dans le dépôt.
 - `HEALTH_SECRET` généré, et décision sur la publication de la consommation mensuelle.
 - Confirmation du budget accepté (100 CU-heures) et du seuil de bascule vers l’écriture regroupée.
 

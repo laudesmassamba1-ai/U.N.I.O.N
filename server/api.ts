@@ -1,11 +1,12 @@
 import crypto from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { getDatabase } from './db';
+import { getDatabase, type Database } from '../lib/server/db';
 import {
   checkMemberRateLimit,
   checkRateLimit,
   createStudioSession,
   getSecurityHeaders,
+  getStudioLoginSecret,
   getStudioSession,
   hashVoterToken,
   isStudioConfigured,
@@ -110,9 +111,9 @@ function sendJson(res: ServerResponse, statusCode: number, data: unknown, extraH
   res.end(JSON.stringify(data));
 }
 
-function renderSharePage(req: IncomingMessage, res: ServerResponse, slug: string): void {
-  const db = getDatabase();
-  const article = db.prepare("SELECT * FROM articles WHERE slug = ? AND status = 'published' AND deleted_at IS NULL").get(slug) as any;
+async function renderSharePage(req: IncomingMessage, res: ServerResponse, slug: string): Promise<void> {
+  const db = await getDatabase();
+  const article = await db.prepare("SELECT * FROM articles WHERE slug = ? AND status = 'published' AND deleted_at IS NULL").get(slug) as any;
 
   const title = article?.title ? `${article.title}` : "U.N.I.O.N, Union Nationale pour l'Unité";
   const standfirst = article?.standfirst ? `${article.standfirst}` : "Un Congo uni travaille. Un Congo divisé mendie.";
@@ -168,7 +169,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       ? decodeURIComponent(pathname.replace(/^\/p\//, '').replace(/\/+$/, ''))
       : null;
   if (method === 'GET' && shareSlug !== null) {
-    renderSharePage(req, res, shareSlug);
+    await renderSharePage(req, res, shareSlug);
     return true;
   }
 
@@ -216,7 +217,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 
     try {
       const metrics = await withDbRetry(async () =>
-        withTimeout(Promise.resolve().then(collectDbMetrics)),
+        withTimeout(collectDbMetrics()),
       );
       sendJson(
         res,
@@ -245,6 +246,23 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     return true;
   }
 
+  // 1 bis. Tâche quotidienne déclenchée par Vercel Cron, protégée par CRON_SECRET.
+  if (pathname === '/api/cron/daily') {
+    if (method !== 'GET') {
+      sendJson(res, 405, { error: 'Méthode non autorisée.' });
+      return true;
+    }
+    const secret = process.env.CRON_SECRET;
+    const provided = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    if (!secret || !constantTimeEqual(provided, secret)) {
+      sendJson(res, 401, { error: 'Accès refusé.' }, { 'Cache-Control': 'no-store' });
+      return true;
+    }
+    const result = await runDailyMaintenance();
+    sendJson(res, 200, { ok: true, ...result }, { 'Cache-Control': 'no-store' });
+    return true;
+  }
+
   // Check if it's an API route
   if (!pathname.startsWith('/api/v1/')) {
     return false;
@@ -257,7 +275,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         const served = await loadSnapshot({
           state: editionSnapshot,
           source: snapshotStore(),
-          build: async () => buildEditionDocument(getDatabase(), req),
+          build: async () => buildEditionDocument(await getDatabase(), req),
         });
         const { payload } = served;
         const updatedAt = payload.document.updatedAt;
@@ -318,7 +336,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       }
       try {
         await withDbRetry(async () => {
-          getDatabase().prepare('SELECT 1').get();
+          await (await getDatabase()).prepare('SELECT 1').get();
         });
       } catch (error) {
         const degraded = degradedResponse(error);
@@ -359,8 +377,8 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       }
 
       // Check existing texts for duplication
-      const db = getDatabase();
-      const existingRows = db.prepare('SELECT text FROM suggestions ORDER BY created_at DESC LIMIT 100').all() as Array<{ text: string }>;
+      const db = await getDatabase();
+      const existingRows = await db.prepare('SELECT text FROM suggestions ORDER BY created_at DESC LIMIT 100').all() as Array<{ text: string }>;
       const modResult = analyseSuggestion({
         text: input.text,
         category: input.category,
@@ -385,7 +403,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       const flagReason = modResult.flagReason || null;
 
       await withDbRetry(async () => {
-        getDatabase()
+        await (await getDatabase())
           .prepare(`
             INSERT INTO suggestions (id, text, category, department, status, flagged, flag_reason, created_at, updated_at)
             VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?)
@@ -416,7 +434,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       };
 
       try {
-        const outcome = await withDbRetry(async () => performVote(getDatabase(), input));
+        const outcome = await withDbRetry(async () => performVote(await getDatabase(), input));
         await refreshPublicEdition();
         sendJson(res, 200, outcome);
       } catch (error) {
@@ -439,8 +457,8 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       const body = await readJsonBody(req);
       const input = validateReportInput(body);
 
-      const db = getDatabase();
-      const suggestion = db.prepare('SELECT id FROM suggestions WHERE id = ?').get(input.suggestionId);
+      const db = await getDatabase();
+      const suggestion = await db.prepare('SELECT id FROM suggestions WHERE id = ?').get(input.suggestionId);
       if (!suggestion) {
         sendJson(res, 404, { error: 'Suggestion introuvable.' });
         return true;
@@ -450,11 +468,15 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       const now = new Date().toISOString();
 
       await withDbRetry(async () => {
-        const target = getDatabase();
-        target.prepare('INSERT INTO reports (id, suggestion_id, reason, created_at) VALUES (?, ?, ?, ?)')
-          .run(reportId, input.suggestionId, input.reason, now);
-        target.prepare('UPDATE suggestions SET report_count = report_count + 1, updated_at = ? WHERE id = ?')
-          .run(now, input.suggestionId);
+        const target = await getDatabase();
+        await target.transaction(async (tx) => {
+          await tx
+            .prepare('INSERT INTO reports (id, suggestion_id, reason, created_at) VALUES (?, ?, ?, ?)')
+            .run(reportId, input.suggestionId, input.reason, now);
+          await tx
+            .prepare('UPDATE suggestions SET report_count = report_count + 1, updated_at = ? WHERE id = ?')
+            .run(now, input.suggestionId);
+        });
       });
       await refreshPublicEdition();
 
@@ -509,24 +531,26 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         return true;
       }
 
-      const db = getDatabase();
-      db.prepare(
-        'INSERT INTO members (id, member_number, full_name, email, department, status, created_at, card_sent_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      ).run(
-        `member-${crypto.randomUUID()}`,
-        memberNumber,
-        input.fullName,
-        input.email,
-        input.department,
-        'dossier_recu',
-        issuedAt,
-        null,
-      );
+      const db = await getDatabase();
+      await db.transaction(async (tx) => {
+        await tx.prepare(
+          'INSERT INTO members (id, member_number, full_name, email, department, status, created_at, card_sent_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        ).run(
+          `member-${crypto.randomUUID()}`,
+          memberNumber,
+          input.fullName,
+          input.email,
+          input.department,
+          'dossier_recu',
+          issuedAt,
+          null,
+        );
 
-      // Conservation maximale de 12 mois, aucune donnée publiée.
-      db.prepare('DELETE FROM members WHERE created_at < ?').run(
-        new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString(),
-      );
+        // Conservation maximale de 12 mois, aucune donnée publiée.
+        await tx.prepare('DELETE FROM members WHERE created_at < ?').run(
+          new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString(),
+        );
+      });
 
       // 2. La carte part au membre.
       const card = buildMemberCard({
@@ -553,7 +577,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         return true;
       }
 
-      db.prepare('UPDATE members SET status = ?, card_sent_at = ? WHERE member_number = ?').run(
+      await db.prepare('UPDATE members SET status = ?, card_sent_at = ? WHERE member_number = ?').run(
         'carte_envoyee',
         issuedAt,
         memberNumber,
@@ -570,8 +594,8 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 
     // 6. GET /api/v1/roadmap
     if (method === 'GET' && pathname === '/api/v1/roadmap') {
-      const db = getDatabase();
-      const steps = db.prepare('SELECT id, step_order as stepOrder, title, status, description, updated_at as updatedAt FROM roadmap ORDER BY step_order ASC').all();
+      const db = await getDatabase();
+      const steps = await db.prepare('SELECT id, step_order AS "stepOrder", title, status, description, updated_at AS "updatedAt" FROM roadmap ORDER BY step_order ASC').all();
       sendJson(res, 200, { steps });
       return true;
     }
@@ -582,14 +606,14 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       if (method === 'POST' && pathname === '/api/v1/studio/login') {
         if (!isStudioConfigured()) {
           sendJson(res, 503, {
-            error: 'Studio non configuré : définissez STUDIO_SECRET (16 caractères minimum).',
+            error: 'Studio non configuré : définissez SESSION_SECRET (32 caractères minimum) ou STUDIO_SECRET (16 caractères minimum).',
           });
           return true;
         }
 
         const body = (await readJsonBody(req)) as any;
         const code = typeof body.code === 'string' ? body.code : '';
-        const expectedSecret = process.env.STUDIO_SECRET as string;
+        const expectedSecret = getStudioLoginSecret() as string;
 
         if (constantTimeEqual(code, expectedSecret)) {
           const session = createStudioSession({
@@ -629,13 +653,13 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         return true;
       }
 
-      const db = getDatabase();
+      const db = await getDatabase('studio');
 
       // 7c-bis. GET /api/v1/studio/health — budget de stockage et sauvegardes.
       if (method === 'GET' && pathname === '/api/v1/studio/health') {
         try {
           const metrics = await withDbRetry(async () =>
-            withTimeout(Promise.resolve().then(collectDbMetrics)),
+            withTimeout(collectDbMetrics()),
           );
           sendJson(res, 200, {
             ok: true,
@@ -656,7 +680,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 
       // 7d. GET /api/v1/studio/suggestions (all suggestions including pending & flagged)
       if (method === 'GET' && pathname === '/api/v1/studio/suggestions') {
-        const rows = db.prepare(`
+        const rows = await db.prepare(`
           SELECT s.*,
             (SELECT response_text FROM suggestion_responses r
               WHERE r.suggestion_id = s.id ORDER BY r.created_at DESC LIMIT 1) AS response_text,
@@ -674,69 +698,80 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         const id = decodeURIComponent(pathname.split('/')[5] || '');
         const body = (await readJsonBody(req)) as any;
         const now = new Date().toISOString();
-        const existing = db.prepare('SELECT id, status FROM suggestions WHERE id = ?').get(id) as any;
+        const existing = await db.prepare('SELECT id, status FROM suggestions WHERE id = ?').get(id) as any;
         if (!existing) {
           sendJson(res, 404, { error: 'Suggestion introuvable.' });
           return true;
         }
 
         const allowedStatuses = ['pending', 'discussion', 'retained', 'adapted', 'integrated', 'archived', 'expired'];
-        if (body.action === 'approve') {
-          db.prepare('UPDATE suggestions SET status = ?, published_at = COALESCE(published_at, ?), updated_at = ? WHERE id = ?')
-            .run('discussion', now, now, id);
-        } else if (body.action === 'archive') {
-          db.prepare('UPDATE suggestions SET status = ?, archived_at = ?, updated_at = ? WHERE id = ?')
-            .run('archived', now, now, id);
-        } else if (body.action === 'status' && typeof body.status === 'string') {
-          if (!allowedStatuses.includes(body.status)) {
-            sendJson(res, 400, { error: 'Statut inconnu.' });
-            return true;
-          }
-          db.prepare('UPDATE suggestions SET status = ?, archived_at = ?, updated_at = ? WHERE id = ?')
-            .run(
-              body.status,
-              body.status === 'archived' || body.status === 'expired' ? now : null,
-              now,
-              id,
-            );
-        } else if (body.action === 'merge') {
+        if (body.action === 'status' && !allowedStatuses.includes(body.status)) {
+          sendJson(res, 400, { error: 'Statut inconnu.' });
+          return true;
+        }
+        if (body.action === 'merge') {
           const target = typeof body.duplicateOf === 'string' ? body.duplicateOf.trim() : '';
           if (!target || target === id) {
             sendJson(res, 400, { error: 'Identifiant de fusion invalide.' });
             return true;
           }
-          const targetExists = db.prepare('SELECT id FROM suggestions WHERE id = ?').get(target);
+          const targetExists = await db.prepare('SELECT id FROM suggestions WHERE id = ?').get(target);
           if (!targetExists) {
             sendJson(res, 404, { error: 'Suggestion cible introuvable.' });
             return true;
           }
-          db.prepare('UPDATE suggestions SET status = ?, duplicate_of = ?, archived_at = ?, updated_at = ? WHERE id = ?')
-            .run('archived', target, now, now, id);
-        } else if (body.action !== 'response') {
+        }
+        if (!['approve', 'archive', 'status', 'merge', 'response'].includes(body.action)) {
           sendJson(res, 400, { error: 'Action de modération inconnue.' });
           return true;
         }
 
-        if (typeof body.response === 'string' && body.response.trim()) {
-          db.prepare('INSERT INTO suggestion_responses (id, suggestion_id, response_text, responder_role, created_at) VALUES (?, ?, ?, ?, ?)')
-            .run(`resp-${crypto.randomUUID()}`, id, body.response.trim(), session.user.role, now);
-          if (existing.status === 'discussion' || existing.status === 'retained') {
-            db.prepare('UPDATE suggestions SET status = ?, updated_at = ? WHERE id = ?')
-              .run('adapted', now, id);
-          } else {
-            db.prepare('UPDATE suggestions SET updated_at = ? WHERE id = ?').run(now, id);
+        await db.transaction(async (tx) => {
+          if (body.action === 'approve') {
+            await tx
+              .prepare('UPDATE suggestions SET status = ?, published_at = COALESCE(published_at, ?), updated_at = ? WHERE id = ?')
+              .run('discussion', now, now, id);
+          } else if (body.action === 'archive') {
+            await tx
+              .prepare('UPDATE suggestions SET status = ?, archived_at = ?, updated_at = ? WHERE id = ?')
+              .run('archived', now, now, id);
+          } else if (body.action === 'status') {
+            await tx
+              .prepare('UPDATE suggestions SET status = ?, archived_at = ?, updated_at = ? WHERE id = ?')
+              .run(
+                body.status,
+                body.status === 'archived' || body.status === 'expired' ? now : null,
+                now,
+                id,
+              );
+          } else if (body.action === 'merge') {
+            await tx
+              .prepare('UPDATE suggestions SET status = ?, duplicate_of = ?, archived_at = ?, updated_at = ? WHERE id = ?')
+              .run('archived', body.duplicateOf.trim(), now, now, id);
           }
-        }
 
-        db.prepare('INSERT INTO audit_log (id, action, target, details, user_role, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-          .run(
-            `aud-${crypto.randomUUID()}`,
+          if (typeof body.response === 'string' && body.response.trim()) {
+            await tx
+              .prepare('INSERT INTO suggestion_responses (id, suggestion_id, response_text, responder_role, created_at) VALUES (?, ?, ?, ?, ?)')
+              .run(`resp-${crypto.randomUUID()}`, id, body.response.trim(), session.user.role, now);
+            if (existing.status === 'discussion' || existing.status === 'retained') {
+              await tx
+                .prepare('UPDATE suggestions SET status = ?, updated_at = ? WHERE id = ?')
+                .run('adapted', now, id);
+            } else {
+              await tx.prepare('UPDATE suggestions SET updated_at = ? WHERE id = ?').run(now, id);
+            }
+          }
+
+          await writeAudit(
+            tx,
             `modération:${body.action || 'response'}`,
             id,
             body.status || body.duplicateOf || body.response || '',
             session.user.role,
             now,
           );
+        });
 
         await refreshPublicEdition({ force: true });
         sendJson(res, 200, { ok: true });
@@ -745,8 +780,10 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 
       // 7f. GET /api/v1/studio/articles
       if (method === 'GET' && pathname === '/api/v1/studio/articles') {
-        const rows = db.prepare('SELECT * FROM articles WHERE deleted_at IS NULL ORDER BY updated_at DESC').all();
-        const articles = rows.map((row: any) => mapArticle(req, row, articleRevisions(db, row.id)));
+        const rows = await db.prepare('SELECT * FROM articles WHERE deleted_at IS NULL ORDER BY updated_at DESC').all();
+        const articles = await Promise.all(
+          rows.map(async (row: any) => mapArticle(req, row, await articleRevisions(db, row.id))),
+        );
         sendJson(res, 200, { articles });
         return true;
       }
@@ -756,58 +793,61 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         const body = (await readJsonBody(req)) as any;
         const id = typeof body.id === 'string' && body.id ? body.id : `art-${crypto.randomUUID()}`;
         const now = new Date().toISOString();
-        const slug = uniqueSlug(db, normaliseSlug(body.slug || body.title || 'article'), id);
         const status = articleStatus(body.status);
-        const article = normaliseArticlePayload(body, {
-          id,
-          slug,
-          status,
-          createdAt: now,
-          updatedAt: now,
-          publishedAt: status === 'published' ? body.publishedAt || now : body.publishedAt || null,
+
+        await db.transaction(async (tx) => {
+          const slug = await uniqueSlug(tx, normaliseSlug(body.slug || body.title || 'article'), id);
+          const article = normaliseArticlePayload(body, {
+            id,
+            slug,
+            status,
+            createdAt: now,
+            updatedAt: now,
+            publishedAt: status === 'published' ? body.publishedAt || now : body.publishedAt || null,
+          });
+
+          await tx.prepare(`
+            INSERT INTO articles (id, slug, title, standfirst, body, lead_image, category, department, nature, status, featured, week_number, week_start, week_end, sources, created_at, updated_at, published_at, archived_at, deleted_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            article.id,
+            article.slug,
+            article.title,
+            article.standfirst,
+            JSON.stringify(article.body),
+            article.leadImage ? JSON.stringify(article.leadImage) : null,
+            article.category,
+            article.department,
+            article.nature,
+            article.status,
+            article.featured ? 1 : 0,
+            article.weekNumber,
+            article.weekStart,
+            article.weekEnd,
+            JSON.stringify(article.sources),
+            article.createdAt,
+            article.updatedAt,
+            article.publishedAt,
+            article.archivedAt,
+            article.deletedAt,
+          );
+
+          if (body.recordRevision !== false) {
+            await insertRevision(tx, article, 'Création', session.user.username, now);
+          }
+          await unfeatureOthers(tx, article);
+          await writeAudit(tx, 'article:création', id, article.title, session.user.role, now);
         });
 
-        db.prepare(`
-          INSERT INTO articles (id, slug, title, standfirst, body, lead_image, category, department, nature, status, featured, week_number, week_start, week_end, sources, created_at, updated_at, published_at, archived_at, deleted_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          article.id,
-          article.slug,
-          article.title,
-          article.standfirst,
-          JSON.stringify(article.body),
-          article.leadImage ? JSON.stringify(article.leadImage) : null,
-          article.category,
-          article.department,
-          article.nature,
-          article.status,
-          article.featured ? 1 : 0,
-          article.weekNumber,
-          article.weekStart,
-          article.weekEnd,
-          JSON.stringify(article.sources),
-          article.createdAt,
-          article.updatedAt,
-          article.publishedAt,
-          article.archivedAt,
-          article.deletedAt,
-        );
-
-        if (body.recordRevision !== false) {
-          insertRevision(db, article, 'Création', session.user.username, now);
-        }
-        unfeatureOthers(db, article);
-        writeAudit(db, 'article:création', id, article.title, session.user.role, now);
-
         await refreshPublicEdition({ force: true });
-        sendJson(res, 201, { ok: true, id, article: mapArticle(req, db.prepare('SELECT * FROM articles WHERE id = ?').get(id), articleRevisions(db, id)) });
+        sendJson(res, 201, { ok: true, id, article: mapArticle(req, await db.prepare('SELECT * FROM articles WHERE id = ?').get(id), await articleRevisions(db, id)) });
         return true;
       }
 
       // 7h. PUT /api/v1/studio/articles/:id (Update)
       if (method === 'PUT' && /^\/api\/v1\/studio\/articles\/[^/]+$/.test(pathname)) {
         const id = decodeURIComponent(pathname.replace('/api/v1/studio/articles/', ''));
-        const existing = db.prepare('SELECT * FROM articles WHERE id = ?').get(id) as any;
+        const existing = await db.prepare('SELECT * FROM articles WHERE id = ?').get(id) as any;
         if (!existing) {
           sendJson(res, 404, { error: 'Article introuvable.' });
           return true;
@@ -815,63 +855,65 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         const body = (await readJsonBody(req)) as any;
         const now = new Date().toISOString();
         const status = articleStatus(body.status);
-        const slug = uniqueSlug(
-          db,
-          normaliseSlug(body.slug || existing.slug || body.title || 'article'),
-          id,
-        );
-        const article = normaliseArticlePayload(body, {
-          id,
-          slug,
-          status,
-          createdAt: existing.created_at,
-          updatedAt: now,
-          publishedAt:
-            status === 'published'
-              ? existing.published_at || body.publishedAt || now
-              : body.publishedAt || existing.published_at || null,
-          archivedAt:
-            body.archivedAt ?? (status === 'archived' ? existing.archived_at || now : existing.archived_at),
-          deletedAt: body.deletedAt ?? existing.deleted_at,
+        await db.transaction(async (tx) => {
+          const slug = await uniqueSlug(
+            tx,
+            normaliseSlug(body.slug || existing.slug || body.title || 'article'),
+            id,
+          );
+          const article = normaliseArticlePayload(body, {
+            id,
+            slug,
+            status,
+            createdAt: existing.created_at,
+            updatedAt: now,
+            publishedAt:
+              status === 'published'
+                ? existing.published_at || body.publishedAt || now
+                : body.publishedAt || existing.published_at || null,
+            archivedAt:
+              body.archivedAt ?? (status === 'archived' ? existing.archived_at || now : existing.archived_at),
+            deletedAt: body.deletedAt ?? existing.deleted_at,
+          });
+
+          await tx.prepare(`
+            UPDATE articles SET
+              slug = ?, title = ?, standfirst = ?, body = ?, lead_image = ?, category = ?,
+              department = ?, nature = ?, status = ?, featured = ?, week_number = ?,
+              week_start = ?, week_end = ?, sources = ?, updated_at = ?,
+              published_at = ?, archived_at = ?, deleted_at = ?
+            WHERE id = ?
+          `).run(
+            article.slug,
+            article.title,
+            article.standfirst,
+            JSON.stringify(article.body),
+            article.leadImage ? JSON.stringify(article.leadImage) : null,
+            article.category,
+            article.department,
+            article.nature,
+            article.status,
+            article.featured ? 1 : 0,
+            article.weekNumber,
+            article.weekStart,
+            article.weekEnd,
+            JSON.stringify(article.sources),
+            article.updatedAt,
+            article.publishedAt,
+            article.archivedAt,
+            article.deletedAt,
+            id,
+          );
+
+          if (body.recordRevision !== false) {
+            await insertRevision(tx, article, body.revisionSummary || 'Modification', session.user.username, now);
+          }
+          await unfeatureOthers(tx, article);
+          await writeAudit(tx, 'article:modification', id, article.title, session.user.role, now);
         });
 
-        db.prepare(`
-          UPDATE articles SET
-            slug = ?, title = ?, standfirst = ?, body = ?, lead_image = ?, category = ?,
-            department = ?, nature = ?, status = ?, featured = ?, week_number = ?,
-            week_start = ?, week_end = ?, sources = ?, updated_at = ?,
-            published_at = ?, archived_at = ?, deleted_at = ?
-          WHERE id = ?
-        `).run(
-          article.slug,
-          article.title,
-          article.standfirst,
-          JSON.stringify(article.body),
-          article.leadImage ? JSON.stringify(article.leadImage) : null,
-          article.category,
-          article.department,
-          article.nature,
-          article.status,
-          article.featured ? 1 : 0,
-          article.weekNumber,
-          article.weekStart,
-          article.weekEnd,
-          JSON.stringify(article.sources),
-          article.updatedAt,
-          article.publishedAt,
-          article.archivedAt,
-          article.deletedAt,
-          id,
-        );
-
-        if (body.recordRevision !== false) {
-          insertRevision(db, article, body.revisionSummary || 'Modification', session.user.username, now);
-        }
-        unfeatureOthers(db, article);
-        writeAudit(db, 'article:modification', id, article.title, session.user.role, now);
-
         await refreshPublicEdition({ force: true });
-        sendJson(res, 200, { ok: true, id, article: mapArticle(req, db.prepare('SELECT * FROM articles WHERE id = ?').get(id), articleRevisions(db, id)) });
+        sendJson(res, 200, { ok: true, id, article: mapArticle(req, await db.prepare('SELECT * FROM articles WHERE id = ?').get(id), await articleRevisions(db, id)) });
         return true;
       }
 
@@ -881,12 +923,14 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         const steps = body.steps || [];
         const now = new Date().toISOString();
 
-        db.exec('DELETE FROM roadmap');
-        const insert = db.prepare('INSERT INTO roadmap (id, step_order, title, status, description, updated_at) VALUES (?, ?, ?, ?, ?, ?)');
-        for (let i = 0; i < steps.length; i++) {
-          const s = steps[i];
-          insert.run(s.id || `step-${i + 1}`, i + 1, s.title, s.status, s.description || '', now);
-        }
+        await db.transaction(async (tx) => {
+          await tx.prepare('DELETE FROM roadmap').run();
+          const insert = tx.prepare('INSERT INTO roadmap (id, step_order, title, status, description, updated_at) VALUES (?, ?, ?, ?, ?, ?)');
+          for (let i = 0; i < steps.length; i++) {
+            const s = steps[i];
+            await insert.run(s.id || `step-${i + 1}`, i + 1, s.title, s.status, s.description || '', now);
+          }
+        });
 
         await refreshPublicEdition({ force: true });
         sendJson(res, 200, { ok: true });
@@ -895,14 +939,14 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 
       // 7j. GET /api/v1/studio/settings
       if (method === 'GET' && pathname === '/api/v1/studio/settings') {
-        sendJson(res, 200, { settings: readSettings(db) });
+        sendJson(res, 200, { settings: await readSettings(db) });
         return true;
       }
 
       // 7k. PUT /api/v1/studio/settings
       if (method === 'PUT' && pathname === '/api/v1/studio/settings') {
         const body = (await readJsonBody(req)) as any;
-        const current = readSettings(db);
+        const current = await readSettings(db);
         const settings = {
           retainedVotes: positiveInt(body.retainedVotes, current.retainedVotes),
           retainedShare: percentage(body.retainedShare, current.retainedShare),
@@ -911,9 +955,12 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
           expiryDays: positiveInt(body.expiryDays, current.expiryDays),
           retentionDays: positiveInt(body.retentionDays, current.retentionDays),
         };
-        db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
-          .run('suggestions', JSON.stringify(settings));
-        writeAudit(db, 'réglages:seuils', 'suggestions', JSON.stringify(settings), session.user.role, new Date().toISOString());
+        await db.transaction(async (tx) => {
+          await tx
+            .prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+            .run('suggestions', JSON.stringify(settings));
+          await writeAudit(tx, 'réglages:seuils', 'suggestions', JSON.stringify(settings), session.user.role, new Date().toISOString());
+        });
         await refreshPublicEdition({ force: true });
         sendJson(res, 200, { ok: true, settings });
         return true;
@@ -921,7 +968,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 
       // 7l. GET /api/v1/studio/audit
       if (method === 'GET' && pathname === '/api/v1/studio/audit') {
-        const logs = db.prepare('SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 200').all();
+        const logs = await db.prepare('SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 200').all();
         sendJson(res, 200, {
           audit: logs.map((row: any) => ({
             id: row.id,
@@ -936,8 +983,8 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 
       // 7m. GET /api/v1/studio/backup (complete server snapshot)
       if (method === 'GET' && pathname === '/api/v1/studio/backup') {
-        const articleRows = db.prepare('SELECT * FROM articles ORDER BY updated_at DESC').all();
-        const suggestionRows = db.prepare(`
+        const articleRows = await db.prepare('SELECT * FROM articles ORDER BY updated_at DESC').all();
+        const suggestionRows = await db.prepare(`
           SELECT s.*,
             (SELECT response_text FROM suggestion_responses r
               WHERE r.suggestion_id = s.id ORDER BY r.created_at DESC LIMIT 1) AS response_text,
@@ -946,20 +993,20 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
           FROM suggestions s
           ORDER BY s.created_at DESC
         `).all();
-        const votes = db.prepare('SELECT * FROM suggestion_votes ORDER BY updated_at DESC').all().map((row: any) => ({
+        const votes = (await db.prepare('SELECT * FROM suggestion_votes ORDER BY updated_at DESC').all()).map((row: any) => ({
           suggestionId: row.suggestion_id,
           voterHash: row.voter_hash,
           value: row.value,
           createdAt: row.created_at,
           updatedAt: row.updated_at,
         }));
-        const reports = db.prepare('SELECT * FROM reports ORDER BY created_at DESC').all().map((row: any) => ({
+        const reports = (await db.prepare('SELECT * FROM reports ORDER BY created_at DESC').all()).map((row: any) => ({
           id: row.id,
           suggestionId: row.suggestion_id,
           reason: row.reason,
           createdAt: row.created_at,
         }));
-        const audit = db.prepare('SELECT * FROM audit_log ORDER BY created_at DESC').all().map((row: any) => ({
+        const audit = (await db.prepare('SELECT * FROM audit_log ORDER BY created_at DESC').all()).map((row: any) => ({
           id: row.id,
           at: row.created_at,
           actor: row.user_role,
@@ -978,11 +1025,13 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
           version: 1,
           revision: Date.now(),
           updatedAt,
-          articles: articleRows.map((row: any) => mapArticle(req, row, articleRevisions(db, row.id))),
+          articles: await Promise.all(
+            articleRows.map(async (row: any) => mapArticle(req, row, await articleRevisions(db, row.id))),
+          ),
           suggestions: suggestionRows.map((row: any) => mapSuggestion(row)),
           votes,
           reports,
-          settings: readSettings(db),
+          settings: await readSettings(db),
           audit,
         });
         return true;
@@ -1021,85 +1070,112 @@ class VoteRejected extends Error {
   }
 }
 
-function performVote(
-  db: any,
+async function performVote(
+  db: Database,
   input: { suggestionId: string; value: 'useful' | 'not_useful'; token: string },
-): {
+): Promise<{
   ok: true;
   suggestionId: string;
   myVote: string | null;
   status: string;
   votesUseful: number;
   votesNotUseful: number;
-} {
-  const suggestion = db.prepare('SELECT * FROM suggestions WHERE id = ?').get(input.suggestionId) as any;
-  if (!suggestion) throw new VoteRejected('not_found');
-  if (!['discussion', 'retained', 'adapted', 'integrated'].includes(suggestion.status)) {
-    throw new VoteRejected('closed');
-  }
-
-  const voterHash = hashVoterToken(input.token);
-  const now = new Date().toISOString();
-  const existingVote = db.prepare(`
-    SELECT value FROM suggestion_votes WHERE suggestion_id = ? AND voter_hash = ?
-  `).get(input.suggestionId, voterHash) as any;
-  let myVote: string | null = input.value;
-
-  if (existingVote) {
-    if (existingVote.value === input.value) {
-      db.prepare('DELETE FROM suggestion_votes WHERE suggestion_id = ? AND voter_hash = ?')
-        .run(input.suggestionId, voterHash);
-      myVote = null;
-    } else {
-      db.prepare('UPDATE suggestion_votes SET value = ?, updated_at = ? WHERE suggestion_id = ? AND voter_hash = ?')
-        .run(input.value, now, input.suggestionId, voterHash);
+}> {
+  return db.transaction(async (tx) => {
+    const suggestion = await tx
+      .prepare('SELECT * FROM suggestions WHERE id = ?')
+      .get(input.suggestionId) as any;
+    if (!suggestion) throw new VoteRejected('not_found');
+    if (!['discussion', 'retained', 'adapted', 'integrated'].includes(suggestion.status)) {
+      throw new VoteRejected('closed');
     }
-  } else {
-    db.prepare('INSERT INTO suggestion_votes (id, suggestion_id, voter_hash, value, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(`vote-${crypto.randomUUID()}`, input.suggestionId, voterHash, input.value, now, now);
-  }
 
-  const countUseful =
-    (db.prepare('SELECT COUNT(*) as count FROM suggestion_votes WHERE suggestion_id = ? AND value = ?')
-      .get(input.suggestionId, 'useful') as any)?.count || 0;
-  const countNotUseful =
-    (db.prepare('SELECT COUNT(*) as count FROM suggestion_votes WHERE suggestion_id = ? AND value = ?')
-      .get(input.suggestionId, 'not_useful') as any)?.count || 0;
-  const settings = readSettings(db);
-  const evaluated = evaluateStatus(
-    {
-      status: suggestion.status,
-      createdAt: suggestion.created_at,
+    const voterHash = hashVoterToken(input.token);
+    const now = new Date().toISOString();
+    const existingVote = await tx
+      .prepare(
+        'SELECT value FROM suggestion_votes WHERE suggestion_id = ? AND voter_hash = ?',
+      )
+      .get(input.suggestionId, voterHash) as any;
+    let myVote: string | null = input.value;
+
+    if (existingVote) {
+      if (existingVote.value === input.value) {
+        await tx
+          .prepare('DELETE FROM suggestion_votes WHERE suggestion_id = ? AND voter_hash = ?')
+          .run(input.suggestionId, voterHash);
+        myVote = null;
+      } else {
+        await tx
+          .prepare(
+            'UPDATE suggestion_votes SET value = ?, updated_at = ? WHERE suggestion_id = ? AND voter_hash = ?',
+          )
+          .run(input.value, now, input.suggestionId, voterHash);
+      }
+    } else {
+      await tx
+        .prepare(
+          'INSERT INTO suggestion_votes (id, suggestion_id, voter_hash, value, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        )
+        .run(`vote-${crypto.randomUUID()}`, input.suggestionId, voterHash, input.value, now, now);
+    }
+
+    const counters = await tx
+      .prepare(
+        `SELECT
+           COUNT(*) FILTER (WHERE value = 'useful') AS useful,
+           COUNT(*) FILTER (WHERE value = 'not_useful') AS not_useful
+         FROM suggestion_votes WHERE suggestion_id = ?`,
+      )
+      .get(input.suggestionId) as any;
+    const countUseful = Number(counters?.useful ?? 0);
+    const countNotUseful = Number(counters?.not_useful ?? 0);
+    const settings = await readSettings(tx);
+    const evaluated = evaluateStatus(
+      {
+        status: suggestion.status,
+        createdAt: suggestion.created_at,
+        votesUseful: countUseful,
+        votesNotUseful: countNotUseful,
+        archivedAt: suggestion.archived_at ?? null,
+      },
+      settings,
+      Date.now(),
+    );
+
+    await tx
+      .prepare(
+        'UPDATE suggestions SET votes_useful = ?, votes_not_useful = ?, status = ?, archived_at = ?, updated_at = ? WHERE id = ?',
+      )
+      .run(
+        countUseful,
+        countNotUseful,
+        evaluated.status,
+        evaluated.archivedAt,
+        now,
+        input.suggestionId,
+      );
+
+    return {
+      ok: true as const,
+      suggestionId: input.suggestionId,
+      myVote,
+      status: evaluated.status,
       votesUseful: countUseful,
       votesNotUseful: countNotUseful,
-      archivedAt: suggestion.archived_at ?? null,
-    },
-    settings,
-    Date.now(),
-  );
-
-  db.prepare('UPDATE suggestions SET votes_useful = ?, votes_not_useful = ?, status = ?, archived_at = ?, updated_at = ? WHERE id = ?')
-    .run(countUseful, countNotUseful, evaluated.status, evaluated.archivedAt, now, input.suggestionId);
-
-  return {
-    ok: true,
-    suggestionId: input.suggestionId,
-    myVote,
-    status: evaluated.status,
-    votesUseful: countUseful,
-    votesNotUseful: countNotUseful,
-  };
+    };
+  });
 }
 
-function buildEditionDocument(db: any, req: IncomingMessage | null): any {
-  const articleRows = db.prepare(`
+async function buildEditionDocument(db: any, req: IncomingMessage | null): Promise<any> {
+  const articleRows = await db.prepare(`
     SELECT * FROM articles
     WHERE status = 'published' AND deleted_at IS NULL
     ORDER BY published_at DESC
   `).all();
   const articles = articleRows.map((row: any) => mapArticle(req, row));
 
-  const suggestionRows = db.prepare(`
+  const suggestionRows = await db.prepare(`
     SELECT s.*,
       (SELECT response_text FROM suggestion_responses r
         WHERE r.suggestion_id = s.id ORDER BY r.created_at DESC LIMIT 1) AS response_text,
@@ -1111,11 +1187,11 @@ function buildEditionDocument(db: any, req: IncomingMessage | null): any {
   `).all();
   const suggestions = suggestionRows.map((row: any) => mapSuggestion(row));
 
-  const settingsRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('suggestions') as any;
+  const settingsRow = await db.prepare('SELECT value FROM settings WHERE key = ?').get('suggestions') as any;
   const settings = { ...DEFAULT_SETTINGS, ...(settingsRow ? safeJsonParse(settingsRow.value, {}) : {}) };
 
-  const roadmap = db.prepare(
-    'SELECT id, step_order as stepOrder, title, status, description, updated_at as updatedAt FROM roadmap ORDER BY step_order ASC',
+  const roadmap = await db.prepare(
+    'SELECT id, step_order AS "stepOrder", title, status, description, updated_at AS "updatedAt" FROM roadmap ORDER BY step_order ASC',
   ).all();
 
   const updatedAt =
@@ -1123,7 +1199,7 @@ function buildEditionDocument(db: any, req: IncomingMessage | null): any {
       ...articles.map((article: any) => article.updatedAt),
       ...suggestions.map((suggestion: any) => suggestion.updatedAt),
       ...roadmap.map((step: any) => step.updatedAt),
-      settingsRow ? settings.editionName : null,
+      settingsRow ? (settings as { editionName?: string }).editionName : null,
     ]) || '1970-01-01T00:00:00.000Z';
 
   const basePayload = {
@@ -1149,43 +1225,77 @@ async function refreshPublicEdition(options: { force?: boolean } = {}): Promise<
       state: editionSnapshot,
       source: snapshotStore(),
       force: options.force,
-      build: async () => buildEditionDocument(getDatabase(), null),
+      build: async () => buildEditionDocument(await getDatabase(), null),
     });
   } catch (error) {
     console.warn('Instantané non reconstruit :', (error as Error)?.message);
   }
 }
 
-function readDatabaseSize(db: any): number | null {
+export interface DailyMaintenanceResult {
+  revisionsPurged: number;
+  suggestionsPurged: number;
+  auditPurged: number;
+}
+
+/** Purge les données au-delà des durées de conservation, puis reconstruit l’instantané. */
+export async function runDailyMaintenance(): Promise<DailyMaintenanceResult> {
+  const db = await getDatabase('studio');
+  const archivedBefore = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  const auditBefore = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+
+  const revisions = await db.prepare(`
+    DELETE FROM article_revisions
+    WHERE id IN (
+      SELECT id FROM (
+        SELECT id, row_number() OVER (PARTITION BY article_id ORDER BY revision_number DESC) AS rn
+        FROM article_revisions
+      ) ranked
+      WHERE rn > 20
+    )
+  `).run();
+  const suggestions = await db.prepare(
+    "DELETE FROM suggestions WHERE status = 'archived' AND archived_at IS NOT NULL AND archived_at < ?",
+  ).run(archivedBefore);
+  const audit = await db.prepare('DELETE FROM audit_log WHERE created_at < ?').run(auditBefore);
+
+  await refreshPublicEdition({ force: true });
+
+  return {
+    revisionsPurged: revisions.changes,
+    suggestionsPurged: suggestions.changes,
+    auditPurged: audit.changes,
+  };
+}
+
+async function readDatabaseSize(db: any): Promise<number | null> {
   try {
-    const pageCount = db.prepare('PRAGMA page_count').get() as any;
-    const pageSize = db.prepare('PRAGMA page_size').get() as any;
-    const count = Number(pageCount?.page_count);
-    const size = Number(pageSize?.page_size);
-    return Number.isFinite(count) && Number.isFinite(size) ? count * size : null;
+    const row = await db.prepare('SELECT pg_database_size(current_database()) AS size').get() as any;
+    const size = Number(row?.size);
+    return Number.isFinite(size) ? size : null;
   } catch {
     return null;
   }
 }
 
-function collectDbMetrics(): {
+async function collectDbMetrics(): Promise<{
   dbSizeBytes: number | null;
   backupAt: string | null;
   backupSizeBytes: number | null;
-} {
-  const db = getDatabase();
-  const backup = db.prepare(
-    'SELECT created_at as at, size_bytes as sizeBytes FROM backup_log ORDER BY created_at DESC LIMIT 1',
+}> {
+  const db = await getDatabase('studio');
+  const backup = await db.prepare(
+    'SELECT created_at AS "at", size_bytes AS "sizeBytes" FROM backup_log ORDER BY created_at DESC LIMIT 1',
   ).get() as any;
   return {
-    dbSizeBytes: readDatabaseSize(db),
+    dbSizeBytes: await readDatabaseSize(db),
     backupAt: backup?.at ?? null,
     backupSizeBytes: typeof backup?.sizeBytes === 'number' ? backup.sizeBytes : null,
   };
 }
 
-function readSettings(db: any): typeof DEFAULT_SETTINGS {
-  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('suggestions') as any;
+async function readSettings(db: any): Promise<typeof DEFAULT_SETTINGS> {
+  const row = await db.prepare('SELECT value FROM settings WHERE key = ?').get('suggestions') as any;
   return { ...DEFAULT_SETTINGS, ...(row ? safeJsonParse(row.value, {}) : {}) };
 }
 
@@ -1221,10 +1331,10 @@ function normaliseSlug(value: unknown): string {
   return slug || 'article';
 }
 
-function uniqueSlug(db: any, base: string, id: string): string {
+async function uniqueSlug(db: any, base: string, id: string): Promise<string> {
   let candidate = base;
   let suffix = 2;
-  while (db.prepare('SELECT id FROM articles WHERE slug = ? AND id <> ?').get(candidate, id)) {
+  while (await db.prepare('SELECT id FROM articles WHERE slug = ? AND id <> ?').get(candidate, id)) {
     candidate = `${base}-${suffix}`;
     suffix += 1;
   }
@@ -1292,8 +1402,8 @@ function mapSuggestion(row: any): any {
   };
 }
 
-function articleRevisions(db: any, articleId: string): any[] {
-  const rows = db.prepare('SELECT * FROM article_revisions WHERE article_id = ? ORDER BY revision_number DESC LIMIT 20').all(articleId);
+async function articleRevisions(db: any, articleId: string): Promise<any[]> {
+  const rows = await db.prepare('SELECT * FROM article_revisions WHERE article_id = ? ORDER BY revision_number DESC LIMIT 20').all(articleId);
   return rows.map((row: any) => {
     const snapshot = safeJsonParse<Record<string, any>>(row.snapshot, {});
     return {
@@ -1351,20 +1461,20 @@ function normaliseArticlePayload(body: any, overrides: {
   };
 }
 
-function unfeatureOthers(db: any, article: any): void {
+async function unfeatureOthers(db: any, article: any): Promise<void> {
   if (!article.featured || !article.weekStart || article.status !== 'published') return;
-  db.prepare('UPDATE articles SET featured = 0 WHERE id <> ? AND week_start = ? AND status = ?')
+  await db.prepare('UPDATE articles SET featured = 0 WHERE id <> ? AND week_start = ? AND status = ?')
     .run(article.id, article.weekStart, 'published');
 }
 
-function insertRevision(db: any, article: any, summary: string, author: string, now: string): void {
-  const count = (db.prepare('SELECT COUNT(*) as count FROM article_revisions WHERE article_id = ?').get(article.id) as any)?.count || 0;
-  db.prepare('INSERT INTO article_revisions (id, article_id, revision_number, snapshot, summary, author, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+async function insertRevision(db: any, article: any, summary: string, author: string, now: string): Promise<void> {
+  const count = Number((await db.prepare('SELECT COUNT(*) as count FROM article_revisions WHERE article_id = ?').get(article.id) as any)?.count ?? 0);
+  await db.prepare('INSERT INTO article_revisions (id, article_id, revision_number, snapshot, summary, author, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .run(`rev-${crypto.randomUUID()}`, article.id, count + 1, JSON.stringify(article), summary, author, now);
 }
 
-function writeAudit(db: any, action: string, target: string, details: string, role: string, now: string): void {
-  db.prepare('INSERT INTO audit_log (id, action, target, details, user_role, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+async function writeAudit(db: any, action: string, target: string, details: string, role: string, now: string): Promise<void> {
+  await db.prepare('INSERT INTO audit_log (id, action, target, details, user_role, created_at) VALUES (?, ?, ?, ?, ?, ?)')
     .run(`aud-${crypto.randomUUID()}`, action, target, details, role, now);
 }
 

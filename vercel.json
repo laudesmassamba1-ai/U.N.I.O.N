@@ -2,14 +2,16 @@
   "regions": ["lhr1"],
   "buildCommand": "pnpm build",
   "outputDirectory": "dist",
+  "crons": [
+    {
+      "path": "/api/cron/daily",
+      "schedule": "15 2 * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/p/:slug",
       "destination": "/api/v1/share/:slug"
-    },
-    {
-      "source": "/api/(.*)",
-      "destination": "/api"
     }
   ]
 }

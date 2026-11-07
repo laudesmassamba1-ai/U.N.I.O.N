@@ -1,39 +1,46 @@
-import { describe, expect, it, beforeEach } from 'vitest';
-import { getDatabase } from '../server/db';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { getDatabase, resetDatabaseForTests } from '../lib/server/db';
 import { checkRateLimit, createStudioSession, getStudioSession, hashVoterToken } from '../server/security';
 import { evaluateStatus } from '../src/lib/suggestions';
 import type { Suggestion, SuggestionSettings } from '../src/types';
 
-describe('Cycle de vie serveur et intégrité', () => {
-  beforeEach(() => {
-    // Reset or prepare DB
-    const db = getDatabase();
-    db.exec(`
-      DELETE FROM suggestions;
-      DELETE FROM suggestion_votes;
-      DELETE FROM articles;
-      DELETE FROM article_revisions;
-      DELETE FROM audit_log;
-    `);
-  });
+async function db() {
+  return getDatabase();
+}
 
-  it('publication d’un article visible côté public immédiatement', () => {
-    const db = getDatabase();
+describe('Cycle de vie serveur et intégrité', () => {
+  beforeAll(async () => {
+    await resetDatabaseForTests();
+    await getDatabase();
+  }, 60_000);
+
+  beforeEach(async () => {
+    const database = await db();
+    await database.prepare('DELETE FROM reports').run();
+    await database.prepare('DELETE FROM suggestion_votes').run();
+    await database.prepare('DELETE FROM suggestion_responses').run();
+    await database.prepare('DELETE FROM article_revisions').run();
+    await database.prepare('DELETE FROM articles').run();
+    await database.prepare('DELETE FROM suggestions').run();
+    await database.prepare('DELETE FROM audit_log').run();
+    await database.prepare('DELETE FROM members').run();
+  }, 20_000);
+
+  it('publication d’un article visible côté public immédiatement', async () => {
+    const database = await db();
     const now = new Date().toISOString();
     const articleId = 'art-test-1';
 
-    // 1. Insert published article
-    db.prepare(`
+    await database.prepare(`
       INSERT INTO articles (id, slug, title, standfirst, body, category, nature, status, created_at, updated_at, published_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?)
     `).run(articleId, 'test-article', 'Article Test', 'Chapeau', JSON.stringify([]), 'Jeunesse', 'info', now, now, now);
 
-    // 2. Query published articles (public query)
-    const publicArticles = db.prepare(`
+    const publicArticles = await database.prepare(`
       SELECT id, title, slug, status FROM articles WHERE status = 'published' AND deleted_at IS NULL
-    `).all() as Array<{ id: string; title: string; status: string }>;
+    `).all<{ id: string; title: string; status: string }>();
 
-    expect(publicArticles.length).toBe(1);
+    expect(publicArticles).toHaveLength(1);
     expect(publicArticles[0].id).toBe(articleId);
     expect(publicArticles[0].title).toBe('Article Test');
     expect(publicArticles[0].status).toBe('published');
@@ -67,115 +74,86 @@ describe('Cycle de vie serveur et intégrité', () => {
     };
 
     const now = Date.now();
-    // Before threshold
     expect(evaluateStatus(baseSuggestion, settings, now).status).toBe('discussion');
 
-    // 20 useful, 5 not useful (total 25, 80% useful >= 65%) -> Retained
     const retainedSugg = { ...baseSuggestion, votesUseful: 20, votesNotUseful: 5 };
     expect(evaluateStatus(retainedSugg, settings, now).status).toBe('retained');
 
-    // 5 useful, 20 not useful (total 25, 80% not useful >= 70%) -> Archived
     const archivedSugg = { ...baseSuggestion, votesUseful: 5, votesNotUseful: 20 };
     expect(evaluateStatus(archivedSugg, settings, now).status).toBe('archived');
 
-    // 61 days old without reaching threshold -> Expired
     const pastDate = new Date(now - 61 * 24 * 60 * 60 * 1000).toISOString();
     const expiredSugg = { ...baseSuggestion, createdAt: pastDate, votesUseful: 5, votesNotUseful: 2 };
     expect(evaluateStatus(expiredSugg, settings, now).status).toBe('expired');
   });
 
-  it('vote unique par appareil via empreinte HMAC et changement de vote autorisé', () => {
-    const db = getDatabase();
+  it('vote unique par appareil via empreinte HMAC et changement de vote autorisé', async () => {
+    const database = await db();
     const suggestionId = 'sugg-vote-test';
     const deviceToken = 'random-device-token-12345';
     const voterHash = hashVoterToken(deviceToken);
     const now = new Date().toISOString();
 
-    // Insert suggestion first to satisfy foreign key
-    db.prepare(`
+    await database.prepare(`
       INSERT INTO suggestions (id, text, category, created_at, updated_at)
       VALUES (?, 'Suggestion pour le vote', 'Organisation', ?, ?)
     `).run(suggestionId, now, now);
 
-    // First vote: useful
-    db.prepare(`
+    await database.prepare(`
       INSERT INTO suggestion_votes (id, suggestion_id, voter_hash, value, created_at, updated_at)
       VALUES (?, ?, ?, 'useful', ?, ?)
     `).run('v-1', suggestionId, voterHash, now, now);
 
-    const firstVote = db.prepare('SELECT value FROM suggestion_votes WHERE suggestion_id = ? AND voter_hash = ?')
-      .get(suggestionId, voterHash) as { value: string };
-    expect(firstVote.value).toBe('useful');
+    const firstVote = await database
+      .prepare('SELECT value FROM suggestion_votes WHERE suggestion_id = ? AND voter_hash = ?')
+      .get<{ value: string }>(suggestionId, voterHash);
+    expect(firstVote?.value).toBe('useful');
 
-    // Change vote: switch to not_useful
-    db.prepare(`
+    await database.prepare(`
       UPDATE suggestion_votes SET value = 'not_useful', updated_at = ?
       WHERE suggestion_id = ? AND voter_hash = ?
     `).run(now, suggestionId, voterHash);
 
-    const changedVote = db.prepare('SELECT value FROM suggestion_votes WHERE suggestion_id = ? AND voter_hash = ?')
-      .get(suggestionId, voterHash) as { value: string };
-    expect(changedVote.value).toBe('not_useful');
+    const changedVote = await database
+      .prepare('SELECT value FROM suggestion_votes WHERE suggestion_id = ? AND voter_hash = ?')
+      .get<{ value: string }>(suggestionId, voterHash);
+    expect(changedVote?.value).toBe('not_useful');
 
-    // Verify uniqueness: attempting duplicate insert fails
-    expect(() => {
-      db.prepare(`
+    await expect(
+      database.prepare(`
         INSERT INTO suggestion_votes (id, suggestion_id, voter_hash, value, created_at, updated_at)
         VALUES (?, ?, ?, 'useful', ?, ?)
-      `).run('v-2', suggestionId, voterHash, now, now);
-    }).toThrow();
+      `).run('v-2', suggestionId, voterHash, now, now),
+    ).rejects.toThrow();
   });
 
   it('refus d’une troisième suggestion en une heure (limitation de fréquence)', () => {
     const clientIdentifier = `test-client-${Date.now()}`;
-
-    // 1st suggestion: allowed
-    const first = checkRateLimit(clientIdentifier);
-    expect(first.allowed).toBe(true);
-
-    // 2nd suggestion: allowed
-    const second = checkRateLimit(clientIdentifier);
-    expect(second.allowed).toBe(true);
-
-    // 3rd suggestion within 1 hour: rejected
+    expect(checkRateLimit(clientIdentifier).allowed).toBe(true);
+    expect(checkRateLimit(clientIdentifier).allowed).toBe(true);
     const third = checkRateLimit(clientIdentifier);
     expect(third.allowed).toBe(false);
     expect(third.retryAfterSeconds).toBeGreaterThan(0);
   });
 
-  it('absence d’adresse IP et de données personnelles dans la base et les journaux', () => {
-    const db = getDatabase();
-    
-    // Check column info of suggestions table
-    const suggCols = db.prepare("PRAGMA table_info(suggestions)").all() as Array<{ name: string }>;
-    const suggColNames = suggCols.map((c) => c.name.toLowerCase());
-    expect(suggColNames).not.toContain('ip');
-    expect(suggColNames).not.toContain('user_agent');
-    expect(suggColNames).not.toContain('email');
-    expect(suggColNames).not.toContain('phone');
-
-    // Check column info of suggestion_votes table
-    const voteCols = db.prepare("PRAGMA table_info(suggestion_votes)").all() as Array<{ name: string }>;
-    const voteColNames = voteCols.map((c) => c.name.toLowerCase());
-    expect(voteColNames).not.toContain('ip');
-    expect(voteColNames).not.toContain('user_agent');
-    expect(voteColNames).not.toContain('email');
-    expect(voteColNames).not.toContain('phone');
-
-    // Check column info of audit_log
-    const auditCols = db.prepare("PRAGMA table_info(audit_log)").all() as Array<{ name: string }>;
-    const auditColNames = auditCols.map((c) => c.name.toLowerCase());
-    expect(auditColNames).not.toContain('ip');
-    expect(auditColNames).not.toContain('ip_address');
+  it('absence d’adresse IP et de données personnelles dans la base et les journaux', async () => {
+    const database = await db();
+    const result = await database.query<{ table_name: string; column_name: string }>(
+      `select table_name, column_name from information_schema.columns
+       where table_schema = 'public'
+         and table_name in ('suggestions', 'suggestion_votes', 'reports', 'audit_log')`,
+    );
+    const forbidden = ['ip', 'ip_address', 'user_agent', 'email', 'phone'];
+    for (const row of result) {
+      expect(forbidden).not.toContain(row.column_name.toLowerCase());
+    }
   });
 
   it('échec de l’accès au Studio sans session valide', () => {
-    // 1. Without session token
     expect(getStudioSession(undefined)).toBeNull();
     expect(getStudioSession(null)).toBeNull();
     expect(getStudioSession('invalid-token')).toBeNull();
 
-    // 2. With valid session
     const session = createStudioSession({ id: 'u1', username: 'admin', role: 'admin' });
     const verified = getStudioSession(session.token);
     expect(verified).not.toBeNull();

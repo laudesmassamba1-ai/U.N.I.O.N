@@ -1,19 +1,21 @@
 # Neon : vivre sous le plan gratuit
 
-Annexe de `SKILL.md`, section 5. La cible reste **PostgreSQL sur Neon (plan gratuit), site et API sur Vercel**. Ce document décrit ce qui est en place dans ce dépôt, ce qui est préparé et ce qui reste à brancher. Il ne prétend pas que la migration du moteur est faite : voir « État réel » plus bas.
+Annexe de `SKILL.md`, section 5. La cible reste **PostgreSQL sur Neon (plan gratuit), site et API sur Vercel**. Ce document décrit ce qui est en place dans ce dépôt et ce qui reste à faire ; le runtime PostgreSQL est branché, voir « État réel » plus bas.
 
 ## État réel
 
-Le serveur livré ouvre encore **SQLite** (`server/db.ts`, `node:sqlite`) pour ses routes. La base Neon est préparée, pas branchée :
+Le runtime serveur sait ouvrir **PostgreSQL sur Neon** (`lib/server/db.ts`) et retombe sur PGlite en développement/test. La connexion est opérationnelle via les chaînes présentes dans `.env.local` ; le CLI Neon, lui, n’est pas authentifié.
 
-- `lib/server/schema.ts` décrit les 13 tables PostgreSQL de référence ;
-- `drizzle/0000_tan_puck.sql` est la migration générée, avec les contraintes de texte, de statut, de valeur de vote et la ligne unique d’instantané ;
+- `lib/server/schema.ts` décrit les 14 tables PostgreSQL de référence, `members` comprise ;
+- `drizzle/0000_union.sql` est la migration appliquée, avec les contraintes de texte, de statut, de valeur de vote et la ligne unique d’instantané ;
+- `drizzle/0001_seed.sql` pose les réglages et la feuille de route initiaux ;
 - `tests/neon-schema.test.ts` applique cette migration dans PGlite et vérifie les contraintes, sans consommer de calcul Neon ;
-- `lib/server/db.ts` crée deux clients HTTP (`app_public`, `app_studio`) et `lib/server/retry.ts` porte les trois essais ;
+- `lib/server/db.ts` choisit la connexion selon le rôle (`DATABASE_URL_APP`, `DATABASE_URL_STUDIO`, `DATABASE_URL_BACKUP_RO`) et partage une seule base PGlite en développement/test ;
+- `lib/server/retry.ts` porte les trois essais ;
 - `scripts/db-roles.sql` et `scripts/db-roles.mjs` créent les rôles limités sans afficher leurs mots de passe ;
-- `scripts/prove-neon.ts` fera la preuve réelle quand la connexion existera.
+- `scripts/prove-neon.ts` exécute la preuve réelle.
 
-Ce qui bloque aujourd’hui : **aucune connexion Neon n’est configurée** (pas de `DATABASE_URL*` dans `.env.local`, CLI absente, pas de session autorisée). Les migrations ne sont donc pas appliquées sur Neon et les routes ne lisent pas PostgreSQL. La couche de survie décrite ci-dessous (instantané, réveil, quota, sauvegardes) est déjà active et testée, indépendamment du moteur.
+État vérifié le 7 novembre 2026 : migration appliquée, 14 tables présentes, rôles `app_public`, `app_studio` et `backup_ro` créés, seed appliqué (1 réglage, 3 étapes de feuille de route), preuve réelle repassée (dépôt, publication, deux votes, instantané, nettoyage). Le mot de passe propriétaire, collé dans une conversation, doit être remplacé avant toute mise en ligne, puis `OWNER_PASSWORD_ROTATED=true` posé dans `.env.local`. Restent à faire : rotation du mot de passe propriétaire, déploiement Vercel, variables d’environnement, stockage d’objets et sauvegardes.
 
 ## 1. Limites visées
 
@@ -54,7 +56,7 @@ Ce qui bloque aujourd’hui : **aucune connexion Neon n’est configurée** (pas
 - quota épuisé : dix minutes de répit puis mode dégradé ;
 - classification explicite : `validation`, `constraint`, `quota`, `wake`, `unknown`.
 
-À faire lors du portage : chaîne « pooler », requêtes HTTP simples, WebSocket réservé aux transactions, `statement_timeout` et `idle_in_transaction_session_timeout` posés sur la session, région Vercel alignée sur Neon, trois rôles (API, Studio, lecture seule).
+En place : chaîne « pooler » pour l’API et le Studio, connexion directe réservée aux migrations, requêtes HTTP, WebSocket pour les transactions, `statement_timeout` et `idle_in_transaction_session_timeout`, région `lhr1`, rôles `app_public` / `app_studio` / `backup_ro`. Reste : déploiement Vercel, stockage d’objets et rotation du mot de passe propriétaire.
 
 ## 5. Mode dégradé
 
@@ -77,7 +79,9 @@ Deux emplacements logiques, jamais versionnés dans le dépôt :
 - `public/` : instantané `edition.json`, images servies par CDN ;
 - `backups/` : dumps chiffrés, accès privé.
 
-Le contrat `SnapshotSource` permet de changer de fournisseur sans toucher à l’API. `RemoteSnapshotSource` lit `SNAPSHOT_URL` et écrit `SNAPSHOT_WRITE_URL` (URL de put signée). Le choix R2 ou B2 n’est pas encore arrêté ; voir `DECISIONS.md`.
+Fournisseur retenu : **Cloudflare R2**. Deux seaux : `union-public` (instantané `edition.json`, images ; accès public par domaine personnalisé, `r2.dev` réservé aux essais) et `union-backups` (privé, dumps chiffrés). `pnpm storage:setup --confirm` crée les deux seaux dès que le jeton S3 est dans `.env.local`.
+
+Le contrat `SnapshotSource` permet de changer de fournisseur sans toucher à l’API. `RemoteSnapshotSource` lit `SNAPSHOT_URL` et écrit directement dans R2 via `lib/server/objectStore.ts` (`OBJECT_STORE_*`) ; `SNAPSHOT_WRITE_URL` ne sert que de repli. Voir `DECISIONS.md`.
 
 ## 8. Sauvegarde
 
@@ -92,13 +96,14 @@ Le contrat `SnapshotSource` permet de changer de fournisseur sans toucher à l�
 
 ## 9 bis. Ce qui reste à faire après la connexion
 
-1. `neon login` par la personne, ou dépôt des chaînes dans `.env.local` (jamais dans la conversation).
-2. `pnpm db:migrate` avec `DATABASE_URL` (connexion directe du propriétaire).
-3. `pnpm db:roles` puis `pnpm db:seed`.
-4. `pnpm prove:neon` (écrit puis supprime ses lignes de test).
-5. Portage des routes vers `lib/server/handlers` et création des fonctions Vercel (`api/v1/*`, `api/cron/daily`).
-6. Renseigner les variables Vercel, créer le stockage d’objets et la clé `age`.
-7. Brancher le workflow de sauvegarde sur `DATABASE_URL_BACKUP_RO`.
+1. ~~Connexion Neon et dépôt des chaînes dans `.env.local`.~~ Fait.
+2. ~~`pnpm db:migrate` avec `DATABASE_URL`.~~ Fait.
+3. ~~`pnpm db:roles` puis `pnpm db:seed`.~~ Fait.
+4. ~~`pnpm prove:neon`.~~ Fait.
+5. Déployer Vercel : `api/[...path].ts` sert toutes les routes `/api/*` ; `/api/cron/daily` est protégé par `CRON_SECRET` et planifié dans `vercel.json`.
+6. Créer les seaux R2 (`union-public`, `union-backups`) et renseigner les variables Vercel.
+7. Le secret GitHub `DATABASE_URL_BACKUP_RO` et `AGE_PUBLIC_KEY` sont posés ; il reste les secrets S3 et le premier essai du workflow.
+8. ~~Remplacer le mot de passe `neondb_owner` exposé dans `.env.local`.~~ Fait ; le reporter dans Vercel à la création du projet.
 
 ## 10. Exploitation
 

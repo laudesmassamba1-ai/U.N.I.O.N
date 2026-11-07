@@ -31,12 +31,12 @@ for (const typeName of ['Suggestion', 'SuggestionVote', 'SuggestionReport']) {
   if (field) fail(`Interface ${typeName} contient un champ personnel : ${field[0].trim()}`);
 }
 
-// Check database schema in server/db.ts for suggestions and votes tables
-const dbSchemaFile = path.join(root, 'server/db.ts');
+// Check the generated PostgreSQL schema for suggestions and votes tables.
+const dbSchemaFile = path.join(root, 'drizzle/0000_union.sql');
 if (existsSync(dbSchemaFile)) {
   const schema = readFileSync(dbSchemaFile, 'utf8');
   for (const table of ['suggestions', 'suggestion_votes', 'reports']) {
-    const tableBlock = schema.match(new RegExp(`CREATE TABLE IF NOT EXISTS ${table} \\(([\\s\\S]*?)\\);`));
+    const tableBlock = schema.match(new RegExp(`CREATE TABLE "${table}" \\(([\\s\\S]*?)\\n\\);`));
     if (tableBlock) {
       const match = tableBlock[1].match(/\b(ip|user_agent|email|phone)\b/i);
       if (match) {
@@ -97,8 +97,8 @@ if (!suggestionsComponent.includes('api.submitSuggestion')) {
 
 // 6. Carte de membre : données personnelles côté serveur, jamais dans l’édition publique.
 const memberSchema = readFileSync(dbSchemaFile, 'utf8');
-if (!/CREATE TABLE IF NOT EXISTS members[\s\S]*?email TEXT NOT NULL/.test(memberSchema)) {
-  fail('server/db.ts : la table members doit exister et contenir l’adresse e-mail côté serveur.');
+if (!/CREATE TABLE "members"[\s\S]*?"email" text NOT NULL/.test(memberSchema)) {
+  fail('drizzle/0000_union.sql : la table members doit exister et contenir l’adresse e-mail côté serveur.');
 }
 
 const apiSource = readFileSync(path.join(root, 'server/api.ts'), 'utf8');

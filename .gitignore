@@ -11,7 +11,8 @@ coverage/
 .neon/
 /neon.ts
 
-# Base SQLite locale et fichiers WAL/SHM
+# Bases locales PGlite et anciens fichiers SQLite
+data/pglite/
 data/*.sqlite
 data/*.sqlite-*
 

@@ -1,35 +1,28 @@
-import { neon } from '@neondatabase/serverless';
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
 
 /**
- * Pose les seuils initiaux dans `settings`, sans écraser une valeur existante.
- * Utilise le rôle Studio (seul à pouvoir écrire les réglages).
+ * Applique le seed SQL (réglages + feuille de route) avec la connexion
+ * propriétaire. `ON CONFLICT DO NOTHING` rend l’opération rejouable.
+ * Aucun secret n’est affiché.
  */
-const url = process.env.DATABASE_URL_STUDIO || process.env.DATABASE_URL;
+const url = process.env.DATABASE_URL;
 if (!url) {
-  console.error('DATABASE_URL_STUDIO absente. Rien n’a été modifié.');
+  console.error('DATABASE_URL absente. Rien n’a été modifié.');
   process.exit(1);
 }
 
-const defaults = {
-  retainedVotes: 25,
-  retainedShare: 65,
-  archivedVotes: 25,
-  archivedShare: 70,
-  expiryDays: 60,
-  retentionDays: 90,
-  editionName: 'Édition de lancement',
-};
-
-const sql = neon(url);
-await sql`
-  insert into settings (key, value)
-  values ('suggestions', ${JSON.stringify(defaults)}::jsonb)
-  on conflict (key) do nothing
-`;
-
-const rows = await sql`select key from settings where key = 'suggestions'`;
-console.log(
-  rows.length === 1
-    ? 'Réglages par défaut présents (25 votes, 65 %, 70 %, 60 jours, 90 jours).'
-    : 'Réglages non écrits : vérifiez le rôle utilisé.',
+const result = spawnSync(
+  'psql',
+  [url, '-v', 'ON_ERROR_STOP=1', '-f', path.join(process.cwd(), 'drizzle', '0001_seed.sql')],
+  { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
 );
+
+if (result.status !== 0) {
+  console.error('Seed refusé par PostgreSQL.');
+  const connectionPattern = new RegExp('postgres' + '(?:ql)?' + '://\\S+', 'gi');
+  console.error(result.stderr.replace(connectionPattern, '<connexion masquée>'));
+  process.exit(1);
+}
+
+console.log('Réglages et feuille de route initiaux appliqués (sans écrasement).');

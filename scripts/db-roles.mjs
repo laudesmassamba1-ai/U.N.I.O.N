@@ -19,8 +19,9 @@ if (!ownerUrl) {
   console.error('DATABASE_URL absente. Rien n’a été modifié.');
   process.exit(1);
 }
-if (/npg_/.test(ownerUrl)) {
-  console.error('La valeur de DATABASE_URL ressemble à une clé, pas à une chaîne de connexion.');
+const connectionPattern = new RegExp('^postgres' + '(?:ql)?' + '://', 'i');
+if (!connectionPattern.test(ownerUrl)) {
+  console.error('DATABASE_URL doit être une URL de connexion complète.');
   process.exit(1);
 }
 
@@ -57,35 +58,33 @@ if (result.status !== 0) {
   process.exit(1);
 }
 
-function roleUrl(role) {
+function roleUrl(role, pooled = true) {
   const url = new URL(ownerUrl);
   url.username = role;
   url.password = passwords[role];
   url.searchParams.set('sslmode', 'require');
   url.searchParams.delete('channel_binding');
+  if (pooled && !url.hostname.includes('-pooler')) {
+    url.hostname = url.hostname.replace(/^(ep-[^.]+)\./, '$1-pooler.');
+  }
   return url.toString();
-}
-
-if (!parsed.hostname.includes('-pooler')) {
-  console.warn(
-    'La chaîne du propriétaire n’est pas la chaîne « pooler » : remplacez l’hôte par celui du pooler avant d’utiliser DATABASE_URL_APP et DATABASE_URL_STUDIO.',
-  );
 }
 
 const lines = [
   '# Ajouté par scripts/db-roles.mjs. Ne jamais versionner ce fichier.',
   `DATABASE_URL_APP="${roleUrl('app_public')}"`,
   `DATABASE_URL_STUDIO="${roleUrl('app_studio')}"`,
-  '# DATABASE_URL_BACKUP_RO vit uniquement dans les secrets GitHub.',
+  '# À recopier dans les secrets GitHub, jamais sur Vercel.',
+  `DATABASE_URL_BACKUP_RO="${roleUrl('backup_ro', false)}"`,
   '',
 ];
 const current = existsSync(envFile) ? readFileSync(envFile, 'utf8') : '';
 const kept = current
   .split('\n')
-  .filter((line) => !/^DATABASE_URL_(APP|STUDIO)=/.test(line))
+  .filter((line) => !/^DATABASE_URL_(APP|STUDIO|BACKUP_RO)=/.test(line))
   .join('\n')
   .replace(/\n{3,}/g, '\n\n')
   .trimEnd();
 writeFileSync(envFile, `${kept ? `${kept}\n\n` : ''}${lines.join('\n')}`);
 console.log('Rôles créés. DATABASE_URL_APP et DATABASE_URL_STUDIO écrites dans .env.local (valeurs non affichées).');
-console.log('Ajouter DATABASE_URL_BACKUP_RO comme secret GitHub, avec la même valeur que le rôle backup_ro.');
+console.log('Ajouter DATABASE_URL_BACKUP_RO comme secret GitHub.');

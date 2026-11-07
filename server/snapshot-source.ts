@@ -1,11 +1,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { createObjectStore, type ObjectStore } from '../lib/server/objectStore';
 import type { SnapshotSource } from './snapshot';
 
 /**
  * Développement et tests : un fichier hors du dépôt (data/ est ignoré).
  * Production : SNAPSHOT_URL pointe l’objet public servi par le CDN et
- * SNAPSHOT_WRITE_URL reçoit les écritures (URL de put signée, R2 ou B2).
+ * l’écriture passe par le seau R2 (ou une URL de put signée en repli).
  */
 export class FileSnapshotSource implements SnapshotSource {
   constructor(readonly file: string) {}
@@ -30,6 +31,8 @@ export class RemoteSnapshotSource implements SnapshotSource {
   constructor(
     private readonly readUrl: string,
     private readonly writeUrl?: string,
+    private readonly store?: ObjectStore | null,
+    private readonly key = 'edition.json',
   ) {}
 
   async read(): Promise<string | null> {
@@ -46,6 +49,10 @@ export class RemoteSnapshotSource implements SnapshotSource {
   }
 
   async write(body: string): Promise<void> {
+    if (this.store) {
+      await this.store.put(this.key, body, 'application/json');
+      return;
+    }
     if (!this.writeUrl) {
       throw new Error('SNAPSHOT_WRITE_URL absent : instantané non publié.');
     }
@@ -63,7 +70,12 @@ export class RemoteSnapshotSource implements SnapshotSource {
 
 export function createSnapshotSource(env: NodeJS.ProcessEnv = process.env): SnapshotSource {
   if (env.SNAPSHOT_URL) {
-    return new RemoteSnapshotSource(env.SNAPSHOT_URL, env.SNAPSHOT_WRITE_URL || undefined);
+    return new RemoteSnapshotSource(
+      env.SNAPSHOT_URL,
+      env.SNAPSHOT_WRITE_URL || undefined,
+      createObjectStore(env),
+      env.SNAPSHOT_KEY || 'edition.json',
+    );
   }
   return new FileSnapshotSource(
     env.SNAPSHOT_PATH || path.join(process.cwd(), 'data', 'edition.snapshot.json'),

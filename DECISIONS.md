@@ -4,7 +4,7 @@
 
 Le cahier des charges initial décrivait Next.js, pnpm et PostgreSQL. L’application est construite avec Vite + React et un serveur HTTP Node. Le serveur est la source de vérité pour l’édition, les suggestions, les votes, les signalements et le Studio.
 
-Le déploiement Vercel est préparé avec `vercel.json` et `api/index.ts`. La base actuelle est SQLite pour le développement. Aucun adaptateur PostgreSQL n’est encore écrit : Vercel n’offre pas de stockage SQLite persistant.
+Le déploiement Vercel est préparé avec `vercel.json` et `api/index.ts` : une seule fonction sert toutes les routes `/api/*`. La production utilise PostgreSQL sur Neon, avec PGlite en développement et en test et des rôles `app_public` / `app_studio` / `backup_ro`. Le déploiement Vercel et la tâche quotidienne restent à faire.
 
 ## 2. Pas de contenu inventé
 
@@ -20,7 +20,7 @@ La carte utilise les tracés ADM1 de geoBoundaries pour les 12 départements du 
 
 ## 5. Suggestions anonymes
 
-Le modèle ne contient ni nom, ni e-mail, ni téléphone, ni adresse IP, ni agent utilisateur. Un jeton aléatoire local sert à éviter les votes multiples ; seule une empreinte HMAC est conservée. En production, `VOTE_SECRET` (32 caractères minimum) est obligatoire : sans lui, l’API refuse les votes avec un code 503 plutôt que de perdre l’unicité des empreintes. L’anonymat total et le principe « une personne, une voix » ne peuvent pas être garantis ensemble, et l’interface le dit.
+Le modèle ne contient ni nom, ni e-mail, ni téléphone, ni adresse IP, ni agent utilisateur. Un jeton aléatoire local sert à éviter les votes multiples ; seule une empreinte HMAC est conservée. En production, `VOTE_HMAC_SECRET` (32 caractères minimum ; `VOTE_SECRET` reste accepté) est obligatoire : sans lui, l’API refuse les votes avec un code 503 plutôt que de perdre l’unicité des empreintes. L’anonymat total et le principe « une personne, une voix » ne peuvent pas être garantis ensemble, et l’interface le dit.
 
 ## 6. Modération avant publication
 
@@ -32,7 +32,7 @@ Les seuils par défaut sont ceux du cahier des charges : 25 votes et 65 % d’av
 
 ## 8. Studio protégé côté serveur
 
-L’ouverture du Studio exige `STUDIO_SECRET` (16 caractères minimum). Le serveur vérifie le code en temps constant, émet une session signée HMAC valable deux heures et la place dans un cookie `HttpOnly` `SameSite=Strict`. Le code n’est plus stocké côté client et le Studio ne confirme rien sans réponse serveur.
+L’ouverture du Studio exige `SESSION_SECRET` (32 caractères minimum ; `STUDIO_SECRET` reste accepté à 16 caractères). Le serveur vérifie le code en temps constant, émet une session signée HMAC valable deux heures et la place dans un cookie `HttpOnly` `SameSite=Strict`. Le code n’est plus stocké côté client et le Studio ne confirme rien sans réponse serveur.
 
 ## 9. Service worker limité
 
@@ -57,8 +57,12 @@ Une édition publique conserve les suggestions locales encore en attente ainsi q
 - Trois essais sur erreur de réveil (0, 700, 1 500 ms) dans un budget de 8 s ; jamais sur validation ou contrainte. Quota épuisé : dix minutes de répit et réponse 503 avec le texte conservé localement.
 - La sonde courte `/api/health` ne touche jamais la base ; `?deep=1` exige `HEALTH_SECRET`.
 - Le panneau de santé du Studio lit la taille de la base, l’âge de l’instantané et la dernière sauvegarde (`backup_log`), avec alertes à 70 %, 85 % et blocage doux à 95 %.
-- Le moteur reste SQLite pour les routes existantes. Le socle Neon est ajouté séparément : schéma Drizzle, migration générée, clients `app_public`/`app_studio`, rôles minimaux, preuve réelle prête. Il n’est pas branché, faute de session Neon autorisée ; `DATABASE_URL` n’est lue que par les migrations et les scripts. Ne pas déployer sur Vercel en croyant que la base est persistante.
+- Le runtime serveur utilise PostgreSQL sur Neon quand `DATABASE_URL_APP`/`DATABASE_URL_STUDIO` sont présentes, et une seule base PGlite partagée en développement/test. Le schéma Drizzle, la migration, le seed et les trois rôles sont appliqués sur la base Neon de Londres ; la preuve réelle est repassée. Le mot de passe propriétaire exposé a été remplacé et `OWNER_PASSWORD_ROTATED=true` est posé localement ; il reste à le reporter dans Vercel. Le cron quotidien et le routage catch-all sont écrits, mais le déploiement Vercel n’est pas encore fait.
 - Sauvegardes : workflow quotidien chiffré par `age` vers un stockage privé, rétention 8 quotidiennes et 3 mensuelles, test de restauration mensuel dans un PostgreSQL éphémère. La clé privée reste hors ligne.
+
+## 13. Stockage d’objets : Cloudflare R2
+
+R2 est retenu pour les deux seaux : 10 Go-mois gratuits, egress nul, API S3 compatible et domaine personnalisé pour le seau public. Le seau `union-public` sert l’instantané et les images ; `union-backups` reste privé et ne contient que des dumps chiffrés par `age`. Backblaze B2 reste le repli si R2 devient indisponible. La clé privée `age` est générée localement, ignorée par Git, puis conservée hors ligne ; seule la clé publique va dans GitHub.
 
 ## Carte de membre par e-mail
 
