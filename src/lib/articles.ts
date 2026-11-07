@@ -61,6 +61,11 @@ export function articlePath(article: Article): string {
   return `/journal/${article.slug}`;
 }
 
+/** Nom d’élément partagé entre la carte du journal et le titre de l’article. */
+export function articleViewTransitionName(slug: string): string {
+  return `article-${slug.replace(/[^a-zA-Z0-9_-]+/g, '-')}`;
+}
+
 export function nextFeature(
   articles: Article[],
   weekStart: string,

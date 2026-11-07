@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { ArticleBody } from '../components/ArticleBody';
 import { Link } from '../components/Link';
 import { PageHeader } from '../components/Layout';
 import { Container, NatureBadge, Section } from '../components/ui';
 import { WhatsAppCardModal } from '../components/WhatsAppCardModal';
 import { articleNatures, journalPage, site } from '../content/fr';
-import { findArticle } from '../lib/articles';
+import { articleViewTransitionName, findArticle } from '../lib/articles';
 import { formatDate, formatDateTime } from '../lib/dates';
 import { useDatabase, useRouteTitle } from '../lib/hooks';
 import NotFound from './NotFound';
@@ -43,6 +44,12 @@ export default function ArticlePage({ slug }: { slug: string }) {
 
   if (!article) return <NotFound />;
 
+  /* Le titre de la page et celui de la carte partagent le même nom : View Transitions
+     fait glisser l’un vers l’autre. Sans l’API, la navigation reste identique. */
+  const titleStyle = {
+    viewTransitionName: articleViewTransitionName(article.slug),
+  } as CSSProperties;
+
   const nature =
     articleNatures.find((item) => item.value === article.nature)?.label ?? journalPage.natureLabels.info;
   const published = article.publishedAt ? formatDate(article.publishedAt) : '';
@@ -72,6 +79,7 @@ export default function ArticlePage({ slug }: { slug: string }) {
       <PageHeader
         eyebrow={journalPage.title}
         title={article.title}
+        titleStyle={titleStyle}
         breadcrumb={[
           { label: 'Accueil', href: '/' },
           { label: 'Le journal', href: '/journal' },

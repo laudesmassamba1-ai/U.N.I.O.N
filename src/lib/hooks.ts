@@ -85,6 +85,33 @@ export function navigate(to: string, options?: { replace?: boolean }): void {
   }
 }
 
+/**
+ * Ouvre un article en faisant glisser le titre de la carte vers le titre de la page.
+ * Le repli est immédiat : pas d’API, mouvement réduit ou mode économie de données
+ * donnent une navigation normale, sans transition.
+ */
+export function navigateWithTransition(to: string): void {
+  if (typeof document === 'undefined' || typeof window === 'undefined') {
+    navigate(to);
+    return;
+  }
+  const root = document.documentElement;
+  const blocked =
+    root.classList.contains('reduce-motion') || root.classList.contains('data-saver');
+  if (typeof document.startViewTransition !== 'function' || blocked) {
+    navigate(to);
+    return;
+  }
+  document.startViewTransition(async () => {
+    navigate(to);
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() =>
+        window.requestAnimationFrame(() => resolve()),
+      );
+    });
+  });
+}
+
 export function useRouteTitle(title: string): void {
   useEffect(() => {
     const base = 'U.N.I.O.N';

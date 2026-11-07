@@ -4052,6 +4052,26 @@ button {
   gap: 0.5rem;
 }
 
+/* Transition d’élément partagé : carte du journal vers titre de l’article */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 160ms;
+  animation-timing-function: ease-out;
+}
+
+::view-transition-group(*) {
+  animation-duration: 260ms;
+  animation-timing-function: ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
 /* A4 Une & A3 Poster Print Styles */
 .a4-une,
 .a3-poster {

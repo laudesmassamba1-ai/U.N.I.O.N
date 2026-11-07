@@ -1,6 +1,7 @@
+import type { CSSProperties } from 'react';
 import type { Article } from '../types';
 import { formatDate } from '../lib/dates';
-import { articlePath } from '../lib/articles';
+import { articlePath, articleViewTransitionName } from '../lib/articles';
 import { articleNatures, journalPage } from '../content/fr';
 import { Link } from './Link';
 import { NatureBadge } from './ui';
@@ -42,7 +43,10 @@ export function ArticleCard({
           {article.category ? <span>{article.category}</span> : null}
           {date ? <time dateTime={article.publishedAt ?? undefined}>{date}</time> : null}
         </div>
-        <h3 className="article-card__title">
+        <h3
+          className="article-card__title"
+          style={{ viewTransitionName: articleViewTransitionName(article.slug) } as CSSProperties}
+        >
           <Link to={articlePath(article)}>{article.title}</Link>
         </h3>
         {article.standfirst ? (

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { footerNav, site } from '../content/fr';
 import type { DisplayPreferences } from '../lib/hooks';
 import { useRoute } from '../lib/hooks';
@@ -249,19 +249,21 @@ export function PageHeader({
   intro,
   breadcrumb,
   children,
+  titleStyle,
 }: {
   eyebrow?: string;
   title: string;
   intro?: string;
   breadcrumb?: { label: string; href?: string }[];
   children?: ReactNode;
+  titleStyle?: CSSProperties;
 }) {
   return (
     <header className="page-header">
       <Container>
         {breadcrumb ? <Breadcrumb items={breadcrumb} /> : null}
         {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-        <h1>{title}</h1>
+        <h1 style={titleStyle}>{title}</h1>
         {intro ? <p className="page-intro">{intro}</p> : null}
         {children}
       </Container>
