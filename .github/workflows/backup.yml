@@ -1,0 +1,123 @@
+name: Sauvegarde PostgreSQL
+
+on:
+  schedule:
+    - cron: '15 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL_READONLY: ${{ secrets.DATABASE_URL_READONLY }}
+      BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+      BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+      BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+      BACKUP_S3_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+      AGE_PUBLIC_KEY: ${{ secrets.AGE_PUBLIC_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+    steps:
+      - name: Vérifier les secrets
+        run: |
+          for name in DATABASE_URL_READONLY BACKUP_S3_ENDPOINT BACKUP_S3_BUCKET \
+            BACKUP_S3_ACCESS_KEY_ID BACKUP_S3_SECRET_ACCESS_KEY AGE_PUBLIC_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name manquant. Voir ENV.md."
+              exit 1
+            fi
+          done
+
+      - name: Installer les outils
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client age
+          aws --version
+          psql --version
+          age --version
+
+      - name: Nommer la sauvegarde
+        id: name
+        run: echo "stamp=$(date -u +%Y-%m-%dT%H%M)" >> "$GITHUB_OUTPUT"
+
+      - name: Compter les lignes
+        run: |
+          psql "$DATABASE_URL_READONLY" -At -v ON_ERROR_STOP=1 -c "
+            SELECT json_build_object(
+              'articles', (SELECT count(*) FROM articles),
+              'suggestions', (SELECT count(*) FROM suggestions),
+              'votes', (SELECT count(*) FROM suggestion_votes),
+              'reports', (SELECT count(*) FROM reports),
+              'audit', (SELECT count(*) FROM audit_log)
+            );" > counts.json
+          cat counts.json
+
+      - name: Dump
+        run: |
+          pg_dump "$DATABASE_URL_READONLY" \
+            --format=custom --no-owner --no-privileges \
+            --file=union.dump
+          test -s union.dump
+
+      - name: Chiffrer
+        run: |
+          age --recipient "$AGE_PUBLIC_KEY" --output union.dump.age union.dump
+          test -s union.dump.age
+          sha256sum union.dump.age | cut -d' ' -f1 > sha256.txt
+          stat -c%s union.dump.age > size.txt
+
+      - name: Envoyer au stockage privé
+        run: |
+          stamp="${{ steps.name.outputs.stamp }}"
+          aws s3 cp union.dump.age \
+            "s3://$BACKUP_S3_BUCKET/backups/union-$stamp.dump.age" \
+            --endpoint-url "$BACKUP_S3_ENDPOINT"
+          aws s3 cp counts.json \
+            "s3://$BACKUP_S3_BUCKET/backups/union-$stamp.counts.json" \
+            --endpoint-url "$BACKUP_S3_ENDPOINT"
+
+      - name: Journaliser dans backup_log
+        run: |
+          stamp="${{ steps.name.outputs.stamp }}"
+          sha="$(cat sha256.txt)"
+          size="$(cat size.txt)"
+          counts="$(cat counts.json)"
+          psql "$DATABASE_URL_READONLY" -v ON_ERROR_STOP=1 -c "
+            INSERT INTO backup_log (id, created_at, size_bytes, sha256, row_counts, destination)
+            VALUES (
+              'backup-$stamp',
+              now()::text,
+              $size,
+              '$sha',
+              \$\$$counts\$\$,
+              'backups/union-$stamp.dump.age'
+            );"
+
+      - name: Rétention (8 quotidiennes, 3 mensuelles)
+        run: |
+          aws s3 ls "s3://$BACKUP_S3_BUCKET/backups/" \
+            --endpoint-url "$BACKUP_S3_ENDPOINT" \
+            | awk '{ print $4 }' | grep '^union-.*\.dump\.age$' | sort > all.txt
+          monthly=$(grep -c 'union-....-..-01T' all.txt || true)
+          if [ "$monthly" -gt 3 ]; then
+            grep 'union-....-..-01T' all.txt | head -n -3 | while read -r key; do
+              aws s3 rm "s3://$BACKUP_S3_BUCKET/backups/$key" --endpoint-url "$BACKUP_S3_ENDPOINT"
+            done
+          fi
+          grep -v 'union-....-..-01T' all.txt | head -n -8 | while read -r key; do
+            aws s3 rm "s3://$BACKUP_S3_BUCKET/backups/$key" --endpoint-url "$BACKUP_S3_ENDPOINT"
+          done
+
+      - name: Résumé
+        run: |
+          echo "Sauvegarde ${{ steps.name.outputs.stamp }} : $(cat size.txt) octets, SHA-256 $(cat sha256.txt)." >> "$GITHUB_STEP_SUMMARY"
+          echo "Test de restauration : workflow mensuel « Test de restauration »." >> "$GITHUB_STEP_SUMMARY"

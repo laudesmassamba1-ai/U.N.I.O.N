@@ -156,6 +156,16 @@ export function getDatabase(): DatabaseSync {
       created_at TEXT NOT NULL,
       card_sent_at TEXT
     );
+
+    -- Journal des sauvegardes : alimenté par le workflow, lu par la sonde de santé.
+    CREATE TABLE IF NOT EXISTS backup_log (
+      id TEXT PRIMARY KEY,
+      created_at TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      sha256 TEXT NOT NULL,
+      row_counts TEXT NOT NULL,
+      destination TEXT
+    );
   `);
 
   // Initialize default settings if not present

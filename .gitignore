@@ -10,3 +10,7 @@ coverage/
 # Base SQLite locale et fichiers WAL/SHM
 data/*.sqlite
 data/*.sqlite-*
+
+# Instantané public local et sauvegardes (jamais versionnés)
+data/edition.snapshot.json
+data/backups/

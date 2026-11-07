@@ -42,6 +42,16 @@ Les éléments suivants ne peuvent pas être inventés. Tant qu’ils manquent, 
 - Traductions validées en lingala et en kituba des pages essentielles.
 - Choix de la langue par défaut et des libellés de navigation.
 
+## Neon, stockage et sauvegardes
+
+- Compte Neon et région choisie, identique à celle des fonctions Vercel.
+- Chaîne de connexion « pooler » pour l’API, et chaîne d’un rôle **lecture seule** pour les sauvegardes.
+- Projet Vercel et domaine définitif.
+- Compte de stockage compatible S3 (R2 ou B2), compartiment public pour l’instantané et les images, compartiment privé pour `backups/`, avec une URL de put signée.
+- Paire de clés `age` : la clé publique dans les secrets GitHub, la clé privée hors ligne chez le fondateur, jamais dans le dépôt.
+- `HEALTH_SECRET` généré, et décision sur la publication de la consommation mensuelle.
+- Confirmation du budget accepté (100 CU-heures) et du seuil de bascule vers l’écriture regroupée.
+
 ## Contact et diffusion
 
 - Lien d’invitation au groupe WhatsApp.

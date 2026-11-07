@@ -1,0 +1,93 @@
+name: Test de restauration
+
+on:
+  schedule:
+    - cron: '30 3 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: restore
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+      BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      AGE_TEST_PRIVATE_KEY: ${{ secrets.AGE_TEST_PRIVATE_KEY }}
+      TARGET: postgres://postgres:test@localhost:5432/restore
+    steps:
+      - name: Vérifier la clé de test
+        run: |
+          if [ -z "$AGE_TEST_PRIVATE_KEY" ]; then
+            echo "::error::AGE_TEST_PRIVATE_KEY manquante. Le test de restauration ne peut pas tourner."
+            exit 1
+          fi
+
+      - name: Installer les outils
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client age jq
+          psql --version
+
+      - name: Télécharger la dernière sauvegarde
+        run: |
+          key=$(aws s3 ls "s3://$BACKUP_S3_BUCKET/backups/" \
+            --endpoint-url "$BACKUP_S3_ENDPOINT" \
+            | awk '{ print $4 }' | grep '\.dump\.age$' | sort | tail -1)
+          if [ -z "$key" ]; then
+            echo "::error::Aucune sauvegarde trouvée dans backups/."
+            exit 1
+          fi
+          echo "Dernière sauvegarde : $key"
+          aws s3 cp "s3://$BACKUP_S3_BUCKET/backups/$key" latest.dump.age \
+            --endpoint-url "$BACKUP_S3_ENDPOINT"
+          counts_key="${key%.dump.age}.counts.json"
+          aws s3 cp "s3://$BACKUP_S3_BUCKET/backups/$counts_key" counts.json \
+            --endpoint-url "$BACKUP_S3_ENDPOINT"
+          echo "counts.json : $(cat counts.json)"
+
+      - name: Déchiffrer et restaurer
+        run: |
+          printf '%s\n' "$AGE_TEST_PRIVATE_KEY" > test-key.txt
+          chmod 600 test-key.txt
+          age --decrypt --identity test-key.txt --output latest.dump latest.dump.age
+          pg_restore --no-owner --no-privileges --dbname "$TARGET" latest.dump
+          rm -f test-key.txt latest.dump
+
+      - name: Comparer les nombres de lignes
+        run: |
+          psql "$TARGET" -At -v ON_ERROR_STOP=1 -c "
+            SELECT json_build_object(
+              'articles', (SELECT count(*) FROM articles),
+              'suggestions', (SELECT count(*) FROM suggestions),
+              'votes', (SELECT count(*) FROM suggestion_votes),
+              'reports', (SELECT count(*) FROM reports),
+              'audit', (SELECT count(*) FROM audit_log)
+            );" > restored.json
+          echo "attendu : $(cat counts.json)"
+          echo "restauré : $(cat restored.json)"
+          if ! jq -e --slurp '.[0] == .[1]' counts.json restored.json > /dev/null; then
+            echo "::error::La restauration ne correspond pas aux comptes sauvegardés."
+            exit 1
+          fi
+
+      - name: Résumé
+        run: echo "Restauration vérifiée le $(date -u +%Y-%m-%d)." >> "$GITHUB_STEP_SUMMARY"

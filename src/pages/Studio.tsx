@@ -29,7 +29,7 @@ import {
   setStudioSession,
 } from '../lib/store';
 import { api } from '../lib/api';
-import type { StudioUser } from '../lib/api';
+import type { StudioHealth, StudioUser } from '../lib/api';
 import { useDatabase, useRouteTitle } from '../lib/hooks';
 import type {
   Article,
@@ -1178,6 +1178,25 @@ function SettingsPanel() {
   useEffect(() => {
     setSettings(database.settings);
   }, [database.settings]);
+
+  const [health, setHealth] = useState<StudioHealth | null>(null);
+  const [healthError, setHealthError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .studioGetHealth()
+      .then((report) => {
+        if (!cancelled) setHealth(report);
+      })
+      .catch((reason) => {
+        if (!cancelled) setHealthError(errorText(reason));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setBusy(true);
@@ -1285,6 +1304,40 @@ function SettingsPanel() {
         <div aria-live="polite">{message ? <p className="note">{message}</p> : null}</div>
         <div aria-live="assertive">{error ? <p className="form-error">{error}</p> : null}</div>
       </form>
+
+      <div className="privacy-note">
+        <p className="eyebrow">Santé de la base</p>
+        {healthError ? <p className="form-error">{healthError}</p> : null}
+        {health ? (
+          <>
+            <p>
+              {health.storage.sizeBytes === null
+                ? 'Taille indisponible.'
+                : `Stockage : ${formatBytes(health.storage.sizeBytes)} sur 1 Go (${health.storage.usedPercent ?? 0} %).`}
+            </p>
+            <p>
+              {health.snapshot.ageSeconds === null
+                ? 'Instantané public : aucun.'
+                : `Instantané public : ${Math.round((health.snapshot.ageSeconds ?? 0) / 60)} min.`}
+            </p>
+            <p>
+              {health.backup.at
+                ? `Dernière sauvegarde : ${formatDate(health.backup.at)}, il y a ${health.backup.ageDays ?? 0} jour(s).`
+                : 'Dernière sauvegarde : aucune.'}
+            </p>
+            {health.writesBlocked ? (
+              <p className="form-error">Stockage à 95 % : nettoyez avant de publier.</p>
+            ) : null}
+            {health.alerts.map((alert) => (
+              <p key={alert.code} className={alert.level === 'critical' ? 'form-error' : 'note'}>
+                {alert.message}
+              </p>
+            ))}
+          </>
+        ) : healthError ? null : (
+          <p className="note">Lecture de l’état…</p>
+        )}
+      </div>
 
       <div className="privacy-note">
         <p className="eyebrow">{studioContent.privacy.title}</p>

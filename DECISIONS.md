@@ -48,6 +48,18 @@ L’API sert l’édition publique avec un ETag et un cache de 60 secondes. `pub
 
 Une édition publique conserve les suggestions locales encore en attente ainsi que les votes et signalements locaux lors d’une fusion. Le serveur reste prioritaire dès qu’il répond.
 
+## 12. Lectures sans base, écritures avec
+
+- L’édition publique est servie depuis un instantané (`server/snapshot.ts`) : mémoire, puis stockage d’objets, puis reconstruction unique si rien n’existe. Les lectures publiques ne réveillent pas la base.
+- Cache CDN : `max-age=60`, `s-maxage=600`, `stale-while-revalidate=86400`, ETag stable.
+- Reconstruction uniquement après une écriture (si l’instantané a plus de dix minutes), sur action du Studio (forcée) ou si l’instantané manque. Aucune tâche fréquente.
+- Réveil à l’intention (`POST /api/v1/warm`) limité à une fois par dix minutes, après saisie réelle et preuve de calcul. Son pire cas consomme trop de calcul : un plafond quotidien reste à ajouter avant un trafic continu.
+- Trois essais sur erreur de réveil (0, 700, 1 500 ms) dans un budget de 8 s ; jamais sur validation ou contrainte. Quota épuisé : dix minutes de répit et réponse 503 avec le texte conservé localement.
+- La sonde courte `/api/health` ne touche jamais la base ; `?deep=1` exige `HEALTH_SECRET`.
+- Le panneau de santé du Studio lit la taille de la base, l’âge de l’instantané et la dernière sauvegarde (`backup_log`), avec alertes à 70 %, 85 % et blocage doux à 95 %.
+- Le moteur reste SQLite : le portage Neon/PostgreSQL n’est pas fait. La couche ci-dessus est écrite pour ne pas dépendre du moteur, mais `DATABASE_URL` n’est encore lue par personne. Ne pas déployer sur Vercel en croyant que la base est persistante.
+- Sauvegardes : workflow quotidien chiffré par `age` vers un stockage privé, rétention 8 quotidiennes et 3 mensuelles, test de restauration mensuel dans un PostgreSQL éphémère. La clé privée reste hors ligne.
+
 ## Carte de membre par e-mail
 
 - La demande de carte est un service distinct de l’adhésion : l’adhésion reste le groupe WhatsApp.

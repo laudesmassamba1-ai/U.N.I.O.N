@@ -51,6 +51,25 @@ const VOTABLE_STATUSES: Suggestion['status'][] = [
   'integrated',
 ];
 
+const DRAFT_KEY = 'union.suggestion.draft.v1';
+
+function readDraft(): { text: string; category: string; department: string } {
+  if (typeof window === 'undefined') return { text: '', category: '', department: '' };
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(DRAFT_KEY) || 'null') as Record<
+      string,
+      unknown
+    > | null;
+    return {
+      text: typeof parsed?.text === 'string' ? parsed.text : '',
+      category: typeof parsed?.category === 'string' ? parsed.category : '',
+      department: typeof parsed?.department === 'string' ? parsed.department : '',
+    };
+  } catch {
+    return { text: '', category: '', department: '' };
+  }
+}
+
 function statusLabel(status: Suggestion['status']): string {
   return suggestionsPage.statusLabels[status];
 }
@@ -62,9 +81,10 @@ function statusDescription(status: Suggestion['status']): string {
 export default function Suggestions() {
   useRouteTitle('Boîte à suggestions');
   const database = useDatabase();
-  const [text, setText] = useState('');
-  const [category, setCategory] = useState('');
-  const [department, setDepartment] = useState('');
+  const [draft] = useState(readDraft);
+  const [text, setText] = useState(draft.text);
+  const [category, setCategory] = useState(draft.category);
+  const [department, setDepartment] = useState(draft.department);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [received, setReceived] = useState(false);
@@ -72,6 +92,31 @@ export default function Suggestions() {
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
   const refreshed = useRef(false);
+  const warmRequested = useRef(false);
+
+  /* Le texte saisi reste sur cet appareil, même si le serveur est indisponible. */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ text, category, department }));
+    } catch {
+      // Stockage plein : le texte reste à l’écran.
+    }
+  }, [text, category, department]);
+
+  /* Réveil à l’intention : une seule fois, dès qu’une saisie réelle existe. */
+  useEffect(() => {
+    const trimmed = text.trim();
+    if (warmRequested.current || trimmed.length < 40) return;
+    warmRequested.current = true;
+    let cancelled = false;
+    proofOfWork(trimmed, 2).then((pow) => {
+      if (!cancelled) void api.warm(trimmed, String(pow.nonce));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [text]);
 
   useEffect(() => {
     if (refreshed.current) return;

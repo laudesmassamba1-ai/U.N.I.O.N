@@ -22,6 +22,17 @@ import {
 } from './validator';
 import { buildMemberCard, buildMemberDossier, createMemberNumber } from './member-card';
 import { dossierRecipients, isMailConfigured, sendMail } from './mail';
+import { buildHealthReport, DB_STORAGE_LIMIT_BYTES } from './health';
+import {
+  createSnapshotState,
+  loadSnapshot,
+  rebuildSnapshot,
+  SNAPSHOT_CACHE_CONTROL,
+  snapshotUpdatedAt,
+} from './snapshot';
+import { createSnapshotSource } from './snapshot-source';
+import { classifyDatabaseError, degradedResponse, withDbRetry, withTimeout } from './resilience';
+import { requestWarm, WARM_MIN_TEXT_LENGTH } from './warm';
 import { analyseSuggestion } from '../src/lib/moderation';
 import { DEFAULT_SETTINGS, evaluateStatus } from '../src/lib/suggestions';
 
@@ -48,6 +59,14 @@ export function parseCookies(cookieHeader?: string): Record<string, string> {
 }
 
 class PayloadTooLargeError extends Error {}
+
+const editionSnapshot = createSnapshotState();
+let snapshotSource: ReturnType<typeof createSnapshotSource> | null = null;
+
+function snapshotStore(): ReturnType<typeof createSnapshotSource> {
+  snapshotSource ??= createSnapshotSource();
+  return snapshotSource;
+}
 
 export async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -153,74 +172,165 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     return true;
   }
 
+  // Sonde de santé. La version courte ne touche jamais la base.
+  if (method === 'GET' && pathname === '/api/health') {
+    const deep = url.searchParams.get('deep') === '1';
+    const updatedAt = snapshotUpdatedAt(editionSnapshot);
+    const parsedUpdatedAt = updatedAt ? Date.parse(updatedAt) : Number.NaN;
+    const snapshot = {
+      updatedAt,
+      ageSeconds: Number.isFinite(parsedUpdatedAt)
+        ? Math.max(0, Math.round((Date.now() - parsedUpdatedAt) / 1000))
+        : null,
+    };
+
+    if (!deep) {
+      sendJson(
+        res,
+        200,
+        {
+          ok: true,
+          service: 'union-api',
+          database: 'untouched',
+          snapshot,
+          storageLimitBytes: DB_STORAGE_LIMIT_BYTES,
+        },
+        { 'Cache-Control': 'no-store' },
+      );
+      return true;
+    }
+
+    const secret = process.env.HEALTH_SECRET;
+    if (!secret) {
+      sendJson(res, 503, { error: 'Sonde profonde non configurée (HEALTH_SECRET).' });
+      return true;
+    }
+    const provided =
+      (req.headers.authorization || '').replace(/^Bearer\s+/i, '') ||
+      url.searchParams.get('key') ||
+      '';
+    if (!constantTimeEqual(provided, secret)) {
+      sendJson(res, 401, { error: 'Accès refusé.' });
+      return true;
+    }
+
+    try {
+      const metrics = await withDbRetry(async () =>
+        withTimeout(Promise.resolve().then(collectDbMetrics)),
+      );
+      sendJson(
+        res,
+        200,
+        {
+          ok: true,
+          service: 'union-api',
+          database: 'ok',
+          ...buildHealthReport({ ...metrics, snapshotUpdatedAt: updatedAt }),
+        },
+        { 'Cache-Control': 'no-store' },
+      );
+    } catch (error) {
+      sendJson(
+        res,
+        503,
+        {
+          ok: false,
+          service: 'union-api',
+          database: 'unavailable',
+          code: classifyDatabaseError(error),
+        },
+        { 'Cache-Control': 'no-store' },
+      );
+    }
+    return true;
+  }
+
   // Check if it's an API route
   if (!pathname.startsWith('/api/v1/')) {
     return false;
   }
 
   try {
-    const db = getDatabase();
-
-    // 2. GET /api/v1/edition
+    // 2. GET /api/v1/edition — instantané public, sans réveil de la base.
     if (method === 'GET' && pathname === '/api/v1/edition') {
-      const articleRows = db.prepare(`
-        SELECT * FROM articles
-        WHERE status = 'published' AND deleted_at IS NULL
-        ORDER BY published_at DESC
-      `).all();
-      const articles = articleRows.map((row: any) => mapArticle(req, row));
+      try {
+        const served = await loadSnapshot({
+          state: editionSnapshot,
+          source: snapshotStore(),
+          build: async () => buildEditionDocument(getDatabase(), req),
+        });
+        const { payload } = served;
+        const updatedAt = payload.document.updatedAt;
+        const parsed = Date.parse(updatedAt);
+        const age = Number.isFinite(parsed)
+          ? Math.max(0, Math.round((Date.now() - parsed) / 1000))
+          : null;
+        const headers = {
+          ETag: payload.etag,
+          'Cache-Control': SNAPSHOT_CACHE_CONTROL,
+          'X-Snapshot-Origin': served.origin,
+          'X-Snapshot-Updated-At': updatedAt,
+          'X-Snapshot-Age': age === null ? 'unknown' : String(age),
+        };
 
-      const suggestionRows = db.prepare(`
-        SELECT s.*,
-          (SELECT response_text FROM suggestion_responses r
-            WHERE r.suggestion_id = s.id ORDER BY r.created_at DESC LIMIT 1) AS response_text,
-          (SELECT created_at FROM suggestion_responses r
-            WHERE r.suggestion_id = s.id ORDER BY r.created_at DESC LIMIT 1) AS response_created_at
-        FROM suggestions s
-        WHERE s.status IN ('discussion', 'retained', 'adapted', 'integrated', 'expired')
-        ORDER BY s.created_at DESC
-      `).all();
-      const suggestions = suggestionRows.map((row: any) => mapSuggestion(row));
+        if (req.headers['if-none-match'] === payload.etag) {
+          res.writeHead(304, { ...getSecurityHeaders(), ...headers });
+          res.end();
+          return true;
+        }
 
-      const settingsRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('suggestions') as any;
-      const settings = { ...DEFAULT_SETTINGS, ...(settingsRow ? safeJsonParse(settingsRow.value, {}) : {}) };
-
-      const roadmap = db.prepare('SELECT id, step_order as stepOrder, title, status, description, updated_at as updatedAt FROM roadmap ORDER BY step_order ASC').all();
-
-      const updatedAt = latestIso([
-        ...articles.map((article: any) => article.updatedAt),
-        ...suggestions.map((suggestion: any) => suggestion.updatedAt),
-        ...roadmap.map((step: any) => step.updatedAt),
-        settingsRow ? settings.editionName : null,
-      ]) || '1970-01-01T00:00:00.000Z';
-
-      const basePayload = {
-        format: 'union-edition',
-        version: 1,
-        updatedAt,
-        articles,
-        suggestions,
-        settings,
-        roadmap,
-      };
-      const revision = parseInt(
-        crypto.createHash('md5').update(JSON.stringify(basePayload)).digest('hex').slice(0, 12),
-        16,
-      );
-      const responsePayload = { ...basePayload, revision };
-      const payloadString = JSON.stringify(responsePayload);
-      const etag = `"${crypto.createHash('md5').update(payloadString).digest('hex')}"`;
-
-      if (req.headers['if-none-match'] === etag) {
-        res.writeHead(304, { ...getSecurityHeaders(), ETag: etag });
-        res.end();
+        res.writeHead(200, {
+          ...getSecurityHeaders(),
+          'Content-Type': 'application/json; charset=utf-8',
+          ...headers,
+        });
+        res.end(payload.body);
+        return true;
+      } catch (error) {
+        const degraded = degradedResponse(error);
+        if (!degraded) throw error;
+        sendJson(res, degraded.status, degraded.body, {
+          'Cache-Control': 'no-store',
+          'Retry-After': String(degraded.retryAfterSeconds),
+        });
         return true;
       }
+    }
 
-      sendJson(res, 200, responsePayload, {
-        ETag: etag,
-        'Cache-Control': 'public, max-age=60, s-maxage=60',
-      });
+    // 2b. POST /api/v1/warm — réveil à l’intention, une fois par dix minutes.
+    if (method === 'POST' && pathname === '/api/v1/warm') {
+      const body = (await readJsonBody(req)) as { text?: unknown; proof?: unknown };
+      const text = typeof body?.text === 'string' ? body.text.trim() : '';
+      const proof = typeof body?.proof === 'string' ? body.proof : '';
+      if (text.length < WARM_MIN_TEXT_LENGTH || !proof || !verifyProofOfWork(text, proof)) {
+        sendJson(res, 400, { error: 'Requête de réveil refusée.' });
+        return true;
+      }
+      const gate = requestWarm();
+      if (!gate.allowed) {
+        sendJson(
+          res,
+          429,
+          { error: 'La base a déjà été réveillée récemment.', retryAfter: gate.retryAfterSeconds },
+          { 'Cache-Control': 'no-store', 'Retry-After': String(gate.retryAfterSeconds ?? 600) },
+        );
+        return true;
+      }
+      try {
+        await withDbRetry(async () => {
+          getDatabase().prepare('SELECT 1').get();
+        });
+      } catch (error) {
+        const degraded = degradedResponse(error);
+        sendJson(
+          res,
+          degraded?.status ?? 503,
+          degraded?.body ?? { error: 'La base de données ne répond pas.' },
+          { 'Cache-Control': 'no-store' },
+        );
+        return true;
+      }
+      sendJson(res, 200, { warm: true }, { 'Cache-Control': 'no-store' });
       return true;
     }
 
@@ -249,6 +359,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       }
 
       // Check existing texts for duplication
+      const db = getDatabase();
       const existingRows = db.prepare('SELECT text FROM suggestions ORDER BY created_at DESC LIMIT 100').all() as Array<{ text: string }>;
       const modResult = analyseSuggestion({
         text: input.text,
@@ -273,10 +384,15 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       const flagged = modResult.flagged ? 1 : 0;
       const flagReason = modResult.flagReason || null;
 
-      db.prepare(`
-        INSERT INTO suggestions (id, text, category, department, status, flagged, flag_reason, created_at, updated_at)
-        VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?)
-      `).run(id, input.text, input.category, input.department || null, flagged, flagReason, now, now);
+      await withDbRetry(async () => {
+        getDatabase()
+          .prepare(`
+            INSERT INTO suggestions (id, text, category, department, status, flagged, flag_reason, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?)
+          `)
+          .run(id, input.text, input.category, input.department || null, flagged, flagReason, now, now);
+      });
+      await refreshPublicEdition();
 
       sendJson(res, 202, {
         id,
@@ -286,72 +402,35 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       return true;
     }
 
-    // 4. POST /api/v1/votes
+    // 4. POST /api/v1/votes — une instruction par vote, compteurs renvoyés.
     if (method === 'POST' && pathname === '/api/v1/votes') {
       if (!isVoteConfigured() && process.env.NODE_ENV === 'production') {
         sendJson(res, 503, { error: 'Le vote n’est pas configuré sur ce serveur.' });
         return true;
       }
       const body = await readJsonBody(req);
-      const input = validateVoteInput(body);
+      const input = validateVoteInput(body) as {
+        suggestionId: string;
+        value: 'useful' | 'not_useful';
+        token: string;
+      };
 
-      const suggestion = db.prepare('SELECT * FROM suggestions WHERE id = ?').get(input.suggestionId) as any;
-      if (!suggestion) {
-        sendJson(res, 404, { error: 'Suggestion introuvable.' });
-        return true;
-      }
-      if (!['discussion', 'retained', 'adapted', 'integrated'].includes(suggestion.status)) {
-        sendJson(res, 409, { error: 'Cette suggestion n’est plus ouverte au vote.' });
-        return true;
-      }
-
-      const voterHash = hashVoterToken(input.token);
-      const now = new Date().toISOString();
-      const existingVote = db.prepare(`
-        SELECT value FROM suggestion_votes WHERE suggestion_id = ? AND voter_hash = ?
-      `).get(input.suggestionId, voterHash) as any;
-      let myVote: string | null = input.value;
-
-      if (existingVote) {
-        if (existingVote.value === input.value) {
-          db.prepare('DELETE FROM suggestion_votes WHERE suggestion_id = ? AND voter_hash = ?')
-            .run(input.suggestionId, voterHash);
-          myVote = null;
-        } else {
-          db.prepare('UPDATE suggestion_votes SET value = ?, updated_at = ? WHERE suggestion_id = ? AND voter_hash = ?')
-            .run(input.value, now, input.suggestionId, voterHash);
+      try {
+        const outcome = await withDbRetry(async () => performVote(getDatabase(), input));
+        await refreshPublicEdition();
+        sendJson(res, 200, outcome);
+      } catch (error) {
+        if (error instanceof VoteRejected) {
+          sendJson(res, error.reason === 'not_found' ? 404 : 409, {
+            error:
+              error.reason === 'not_found'
+                ? 'Suggestion introuvable.'
+                : 'Cette suggestion n’est plus ouverte au vote.',
+          });
+          return true;
         }
-      } else {
-        db.prepare('INSERT INTO suggestion_votes (id, suggestion_id, voter_hash, value, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-          .run(`vote-${crypto.randomUUID()}`, input.suggestionId, voterHash, input.value, now, now);
+        throw error;
       }
-
-      const countUseful = (db.prepare('SELECT COUNT(*) as count FROM suggestion_votes WHERE suggestion_id = ? AND value = ?').get(input.suggestionId, 'useful') as any)?.count || 0;
-      const countNotUseful = (db.prepare('SELECT COUNT(*) as count FROM suggestion_votes WHERE suggestion_id = ? AND value = ?').get(input.suggestionId, 'not_useful') as any)?.count || 0;
-      const settings = readSettings(db);
-      const evaluated = evaluateStatus(
-        {
-          status: suggestion.status,
-          createdAt: suggestion.created_at,
-          votesUseful: countUseful,
-          votesNotUseful: countNotUseful,
-          archivedAt: suggestion.archived_at ?? null,
-        },
-        settings,
-        Date.now(),
-      );
-
-      db.prepare('UPDATE suggestions SET votes_useful = ?, votes_not_useful = ?, status = ?, archived_at = ?, updated_at = ? WHERE id = ?')
-        .run(countUseful, countNotUseful, evaluated.status, evaluated.archivedAt, now, input.suggestionId);
-
-      sendJson(res, 200, {
-        ok: true,
-        suggestionId: input.suggestionId,
-        myVote,
-        status: evaluated.status,
-        votesUseful: countUseful,
-        votesNotUseful: countNotUseful,
-      });
       return true;
     }
 
@@ -360,6 +439,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       const body = await readJsonBody(req);
       const input = validateReportInput(body);
 
+      const db = getDatabase();
       const suggestion = db.prepare('SELECT id FROM suggestions WHERE id = ?').get(input.suggestionId);
       if (!suggestion) {
         sendJson(res, 404, { error: 'Suggestion introuvable.' });
@@ -369,11 +449,14 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       const reportId = `rep-${crypto.randomUUID()}`;
       const now = new Date().toISOString();
 
-      db.prepare('INSERT INTO reports (id, suggestion_id, reason, created_at) VALUES (?, ?, ?, ?)')
-        .run(reportId, input.suggestionId, input.reason, now);
-
-      db.prepare('UPDATE suggestions SET report_count = report_count + 1, updated_at = ? WHERE id = ?')
-        .run(now, input.suggestionId);
+      await withDbRetry(async () => {
+        const target = getDatabase();
+        target.prepare('INSERT INTO reports (id, suggestion_id, reason, created_at) VALUES (?, ?, ?, ?)')
+          .run(reportId, input.suggestionId, input.reason, now);
+        target.prepare('UPDATE suggestions SET report_count = report_count + 1, updated_at = ? WHERE id = ?')
+          .run(now, input.suggestionId);
+      });
+      await refreshPublicEdition();
 
       sendJson(res, 201, { ok: true, reportId });
       return true;
@@ -426,6 +509,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         return true;
       }
 
+      const db = getDatabase();
       db.prepare(
         'INSERT INTO members (id, member_number, full_name, email, department, status, created_at, card_sent_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       ).run(
@@ -486,6 +570,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 
     // 6. GET /api/v1/roadmap
     if (method === 'GET' && pathname === '/api/v1/roadmap') {
+      const db = getDatabase();
       const steps = db.prepare('SELECT id, step_order as stepOrder, title, status, description, updated_at as updatedAt FROM roadmap ORDER BY step_order ASC').all();
       sendJson(res, 200, { steps });
       return true;
@@ -541,6 +626,31 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       // 7c. GET /api/v1/studio/me
       if (method === 'GET' && pathname === '/api/v1/studio/me') {
         sendJson(res, 200, { user: session.user });
+        return true;
+      }
+
+      const db = getDatabase();
+
+      // 7c-bis. GET /api/v1/studio/health — budget de stockage et sauvegardes.
+      if (method === 'GET' && pathname === '/api/v1/studio/health') {
+        try {
+          const metrics = await withDbRetry(async () =>
+            withTimeout(Promise.resolve().then(collectDbMetrics)),
+          );
+          sendJson(res, 200, {
+            ok: true,
+            ...buildHealthReport({
+              ...metrics,
+              snapshotUpdatedAt: snapshotUpdatedAt(editionSnapshot),
+            }),
+          });
+        } catch (error) {
+          sendJson(res, 503, {
+            ok: false,
+            code: classifyDatabaseError(error),
+            error: 'La base de données ne répond pas.',
+          });
+        }
         return true;
       }
 
@@ -628,6 +738,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
             now,
           );
 
+        await refreshPublicEdition({ force: true });
         sendJson(res, 200, { ok: true });
         return true;
       }
@@ -688,6 +799,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         unfeatureOthers(db, article);
         writeAudit(db, 'article:création', id, article.title, session.user.role, now);
 
+        await refreshPublicEdition({ force: true });
         sendJson(res, 201, { ok: true, id, article: mapArticle(req, db.prepare('SELECT * FROM articles WHERE id = ?').get(id), articleRevisions(db, id)) });
         return true;
       }
@@ -758,6 +870,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         unfeatureOthers(db, article);
         writeAudit(db, 'article:modification', id, article.title, session.user.role, now);
 
+        await refreshPublicEdition({ force: true });
         sendJson(res, 200, { ok: true, id, article: mapArticle(req, db.prepare('SELECT * FROM articles WHERE id = ?').get(id), articleRevisions(db, id)) });
         return true;
       }
@@ -775,6 +888,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
           insert.run(s.id || `step-${i + 1}`, i + 1, s.title, s.status, s.description || '', now);
         }
 
+        await refreshPublicEdition({ force: true });
         sendJson(res, 200, { ok: true });
         return true;
       }
@@ -800,6 +914,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
           .run('suggestions', JSON.stringify(settings));
         writeAudit(db, 'réglages:seuils', 'suggestions', JSON.stringify(settings), session.user.role, new Date().toISOString());
+        await refreshPublicEdition({ force: true });
         sendJson(res, 200, { ok: true, settings });
         return true;
       }
@@ -885,10 +1000,188 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       sendJson(res, 400, { error: 'Données non valides', errors: err.errors });
       return true;
     }
+    const degraded = degradedResponse(err);
+    if (degraded) {
+      sendJson(res, degraded.status, degraded.body, {
+        'Cache-Control': 'no-store',
+        'Retry-After': String(degraded.retryAfterSeconds),
+      });
+      return true;
+    }
     console.error('API Error:', err);
     sendJson(res, 500, { error: 'Erreur interne du serveur' });
     return true;
   }
+}
+
+class VoteRejected extends Error {
+  constructor(readonly reason: 'not_found' | 'closed') {
+    super(reason);
+    this.name = 'VoteRejected';
+  }
+}
+
+function performVote(
+  db: any,
+  input: { suggestionId: string; value: 'useful' | 'not_useful'; token: string },
+): {
+  ok: true;
+  suggestionId: string;
+  myVote: string | null;
+  status: string;
+  votesUseful: number;
+  votesNotUseful: number;
+} {
+  const suggestion = db.prepare('SELECT * FROM suggestions WHERE id = ?').get(input.suggestionId) as any;
+  if (!suggestion) throw new VoteRejected('not_found');
+  if (!['discussion', 'retained', 'adapted', 'integrated'].includes(suggestion.status)) {
+    throw new VoteRejected('closed');
+  }
+
+  const voterHash = hashVoterToken(input.token);
+  const now = new Date().toISOString();
+  const existingVote = db.prepare(`
+    SELECT value FROM suggestion_votes WHERE suggestion_id = ? AND voter_hash = ?
+  `).get(input.suggestionId, voterHash) as any;
+  let myVote: string | null = input.value;
+
+  if (existingVote) {
+    if (existingVote.value === input.value) {
+      db.prepare('DELETE FROM suggestion_votes WHERE suggestion_id = ? AND voter_hash = ?')
+        .run(input.suggestionId, voterHash);
+      myVote = null;
+    } else {
+      db.prepare('UPDATE suggestion_votes SET value = ?, updated_at = ? WHERE suggestion_id = ? AND voter_hash = ?')
+        .run(input.value, now, input.suggestionId, voterHash);
+    }
+  } else {
+    db.prepare('INSERT INTO suggestion_votes (id, suggestion_id, voter_hash, value, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(`vote-${crypto.randomUUID()}`, input.suggestionId, voterHash, input.value, now, now);
+  }
+
+  const countUseful =
+    (db.prepare('SELECT COUNT(*) as count FROM suggestion_votes WHERE suggestion_id = ? AND value = ?')
+      .get(input.suggestionId, 'useful') as any)?.count || 0;
+  const countNotUseful =
+    (db.prepare('SELECT COUNT(*) as count FROM suggestion_votes WHERE suggestion_id = ? AND value = ?')
+      .get(input.suggestionId, 'not_useful') as any)?.count || 0;
+  const settings = readSettings(db);
+  const evaluated = evaluateStatus(
+    {
+      status: suggestion.status,
+      createdAt: suggestion.created_at,
+      votesUseful: countUseful,
+      votesNotUseful: countNotUseful,
+      archivedAt: suggestion.archived_at ?? null,
+    },
+    settings,
+    Date.now(),
+  );
+
+  db.prepare('UPDATE suggestions SET votes_useful = ?, votes_not_useful = ?, status = ?, archived_at = ?, updated_at = ? WHERE id = ?')
+    .run(countUseful, countNotUseful, evaluated.status, evaluated.archivedAt, now, input.suggestionId);
+
+  return {
+    ok: true,
+    suggestionId: input.suggestionId,
+    myVote,
+    status: evaluated.status,
+    votesUseful: countUseful,
+    votesNotUseful: countNotUseful,
+  };
+}
+
+function buildEditionDocument(db: any, req: IncomingMessage | null): any {
+  const articleRows = db.prepare(`
+    SELECT * FROM articles
+    WHERE status = 'published' AND deleted_at IS NULL
+    ORDER BY published_at DESC
+  `).all();
+  const articles = articleRows.map((row: any) => mapArticle(req, row));
+
+  const suggestionRows = db.prepare(`
+    SELECT s.*,
+      (SELECT response_text FROM suggestion_responses r
+        WHERE r.suggestion_id = s.id ORDER BY r.created_at DESC LIMIT 1) AS response_text,
+      (SELECT created_at FROM suggestion_responses r
+        WHERE r.suggestion_id = s.id ORDER BY r.created_at DESC LIMIT 1) AS response_created_at
+    FROM suggestions s
+    WHERE s.status IN ('discussion', 'retained', 'adapted', 'integrated', 'expired')
+    ORDER BY s.created_at DESC
+  `).all();
+  const suggestions = suggestionRows.map((row: any) => mapSuggestion(row));
+
+  const settingsRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('suggestions') as any;
+  const settings = { ...DEFAULT_SETTINGS, ...(settingsRow ? safeJsonParse(settingsRow.value, {}) : {}) };
+
+  const roadmap = db.prepare(
+    'SELECT id, step_order as stepOrder, title, status, description, updated_at as updatedAt FROM roadmap ORDER BY step_order ASC',
+  ).all();
+
+  const updatedAt =
+    latestIso([
+      ...articles.map((article: any) => article.updatedAt),
+      ...suggestions.map((suggestion: any) => suggestion.updatedAt),
+      ...roadmap.map((step: any) => step.updatedAt),
+      settingsRow ? settings.editionName : null,
+    ]) || '1970-01-01T00:00:00.000Z';
+
+  const basePayload = {
+    format: 'union-edition',
+    version: 1,
+    updatedAt,
+    articles,
+    suggestions,
+    settings,
+    roadmap,
+  };
+  const revision = parseInt(
+    crypto.createHash('md5').update(JSON.stringify(basePayload)).digest('hex').slice(0, 12),
+    16,
+  );
+  return { ...basePayload, revision };
+}
+
+/** Reconstruction opportuniste : la base est déjà éveillée par l’écriture. */
+async function refreshPublicEdition(options: { force?: boolean } = {}): Promise<void> {
+  try {
+    await rebuildSnapshot({
+      state: editionSnapshot,
+      source: snapshotStore(),
+      force: options.force,
+      build: async () => buildEditionDocument(getDatabase(), null),
+    });
+  } catch (error) {
+    console.warn('Instantané non reconstruit :', (error as Error)?.message);
+  }
+}
+
+function readDatabaseSize(db: any): number | null {
+  try {
+    const pageCount = db.prepare('PRAGMA page_count').get() as any;
+    const pageSize = db.prepare('PRAGMA page_size').get() as any;
+    const count = Number(pageCount?.page_count);
+    const size = Number(pageSize?.page_size);
+    return Number.isFinite(count) && Number.isFinite(size) ? count * size : null;
+  } catch {
+    return null;
+  }
+}
+
+function collectDbMetrics(): {
+  dbSizeBytes: number | null;
+  backupAt: string | null;
+  backupSizeBytes: number | null;
+} {
+  const db = getDatabase();
+  const backup = db.prepare(
+    'SELECT created_at as at, size_bytes as sizeBytes FROM backup_log ORDER BY created_at DESC LIMIT 1',
+  ).get() as any;
+  return {
+    dbSizeBytes: readDatabaseSize(db),
+    backupAt: backup?.at ?? null,
+    backupSizeBytes: typeof backup?.sizeBytes === 'number' ? backup.sizeBytes : null,
+  };
 }
 
 function readSettings(db: any): typeof DEFAULT_SETTINGS {
@@ -952,7 +1245,7 @@ function parseLeadImage(raw: unknown): any {
   return { src: raw, alt: '', caption: '', credit: '' };
 }
 
-function mapArticle(req: IncomingMessage, row: any, revisions: any[] = []): any {
+function mapArticle(req: IncomingMessage | null, row: any, revisions: any[] = []): any {
   return {
     id: row.id,
     slug: row.slug,

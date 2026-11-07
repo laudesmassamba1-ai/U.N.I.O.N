@@ -16,6 +16,14 @@ export interface StudioUser {
   role: 'admin' | 'editor' | 'moderator';
 }
 
+export interface StudioHealth {
+  storage: { sizeBytes: number | null; limitBytes: number; usedPercent: number | null };
+  snapshot: { updatedAt: string | null; ageSeconds: number | null };
+  backup: { at: string | null; ageDays: number | null; sizeBytes: number | null };
+  alerts: Array<{ level: 'info' | 'warn' | 'critical'; code: string; message: string }>;
+  writesBlocked: boolean;
+}
+
 const API_BASE = '/api/v1';
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -68,6 +76,18 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(input),
     });
+  },
+
+  /** Anticipe le réveil de la base quand une saisie réelle commence. Silencieux par nature. */
+  async warm(text: string, proof: string): Promise<void> {
+    try {
+      await request('/warm', {
+        method: 'POST',
+        body: JSON.stringify({ text, proof }),
+      });
+    } catch {
+      // Le réveil est une anticipation : son échec ne change rien pour la personne.
+    }
   },
 
   async submitVote(
@@ -182,6 +202,10 @@ export const api = {
 
   async studioGetAudit(): Promise<{ audit: AuditEntry[] }> {
     return request('/studio/audit');
+  },
+
+  async studioGetHealth(): Promise<StudioHealth> {
+    return request('/studio/health');
   },
 
   async studioGetBackup(): Promise<EditionDocument> {
