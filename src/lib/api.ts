@@ -95,6 +95,23 @@ export const api = {
     });
   },
 
+  async requestMemberCard(input: {
+    fullName: string;
+    email: string;
+    department?: string | null;
+    consent: boolean;
+  }): Promise<{
+    ok: true;
+    cardSent: boolean;
+    memberNumber: string;
+    message?: string;
+  }> {
+    return request('/members', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
   async getRoadmap(): Promise<{ steps: RoadmapStep[] }> {
     try {
       return await request('/roadmap');

@@ -37,6 +37,34 @@ export function checkRateLimit(clientIdentifier: string): { allowed: boolean; re
   return { allowed: true };
 }
 
+// Demandes de carte de membre : 3 par heure et par connexion, même empreinte temporaire.
+const memberBuckets = new Map<string, number[]>();
+const MEMBER_WINDOW = 60 * 60 * 1000;
+const MAX_MEMBER_CARDS_PER_HOUR = 3;
+
+export function checkMemberRateLimit(clientIdentifier: string): {
+  allowed: boolean;
+  retryAfterSeconds?: number;
+} {
+  const salt = getDailySalt();
+  const hash = crypto
+    .createHmac('sha256', salt)
+    .update(`member:${clientIdentifier}`)
+    .digest('hex');
+  const now = Date.now();
+  const timestamps = (memberBuckets.get(hash) ?? []).filter((t) => now - t < MEMBER_WINDOW);
+
+  if (timestamps.length >= MAX_MEMBER_CARDS_PER_HOUR) {
+    const oldest = timestamps[0];
+    const retryAfter = Math.ceil((oldest + MEMBER_WINDOW - now) / 1000);
+    return { allowed: false, retryAfterSeconds: Math.max(1, retryAfter) };
+  }
+
+  timestamps.push(now);
+  memberBuckets.set(hash, timestamps);
+  return { allowed: true };
+}
+
 // Vote Token Anonymization: Server-side HMAC secret
 const fallbackVoteSecret = crypto.randomBytes(32).toString('hex');
 

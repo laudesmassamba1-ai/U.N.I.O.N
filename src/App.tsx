@@ -13,6 +13,7 @@ import Journal from './pages/Journal';
 import ArticlePage from './pages/ArticlePage';
 import Suggestions from './pages/Suggestions';
 import Join from './pages/Join';
+import MemberCard from './pages/MemberCard';
 import Documents from './pages/Documents';
 import Faq from './pages/Faq';
 import Contact from './pages/Contact';
@@ -44,6 +45,7 @@ function RouteView({ path, motionAllowed }: { path: string; motionAllowed: boole
   }
   if (path === '/suggestions') return <Suggestions />;
   if (path === '/rejoindre') return <Join />;
+  if (path === '/carte') return <MemberCard />;
   if (path === '/documents') return <Documents />;
   if (path === '/faq') return <Faq />;
   if (path === '/contact') return <Contact />;

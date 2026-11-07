@@ -1,7 +1,7 @@
 import { Link } from '../components/Link';
 import { PageHeader } from '../components/Layout';
 import { ButtonLink, Container, Section } from '../components/ui';
-import { joinPage, site } from '../content/fr';
+import { joinPage, memberCardPage, site } from '../content/fr';
 import { useRouteTitle } from '../lib/hooks';
 
 export default function Join() {
@@ -28,6 +28,14 @@ export default function Join() {
               ) : (
                 <p className="note">{joinPage.unavailable}</p>
               )}
+            </div>
+
+            <div data-reveal>
+              <h2>{memberCardPage.eyebrow}</h2>
+              <p>{memberCardPage.intro}</p>
+              <Link to="/carte" className="text-link">
+                {memberCardPage.title}
+              </Link>
             </div>
 
             <div data-reveal>

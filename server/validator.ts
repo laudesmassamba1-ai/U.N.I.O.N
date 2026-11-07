@@ -83,6 +83,44 @@ export function validateVoteInput(data: unknown): {
   };
 }
 
+export function validateMemberInput(data: unknown): {
+  fullName: string;
+  email: string;
+  department: string | null;
+} {
+  const errors: ValidationError[] = [];
+  if (!data || typeof data !== 'object') {
+    throw new ValidationException([{ field: 'body', message: 'Corps JSON attendu' }]);
+  }
+  const obj = data as Record<string, unknown>;
+
+  const rawName = typeof obj.fullName === 'string' ? obj.fullName.trim() : '';
+  const cleanName = rawName.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (cleanName.length < 2) {
+    errors.push({ field: 'fullName', message: 'Indiquez un nom de 2 caractères minimum' });
+  } else if (cleanName.length > 80) {
+    errors.push({ field: 'fullName', message: 'Le nom ne doit pas dépasser 80 caractères' });
+  }
+
+  const email = typeof obj.email === 'string' ? obj.email.trim() : '';
+  if (email.length > 160 || !/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(email)) {
+    errors.push({ field: 'email', message: 'Adresse e-mail invalide' });
+  }
+
+  const rawDepartment = typeof obj.department === 'string' ? obj.department.trim() : '';
+  const department = rawDepartment ? rawDepartment.slice(0, 60) : null;
+
+  if (obj.consent !== true) {
+    errors.push({ field: 'consent', message: 'L’accord pour l’envoi de la carte est obligatoire' });
+  }
+
+  if (errors.length > 0) {
+    throw new ValidationException(errors);
+  }
+
+  return { fullName: cleanName, email, department };
+}
+
 export function validateReportInput(data: unknown): {
   suggestionId: string;
   reason: string;

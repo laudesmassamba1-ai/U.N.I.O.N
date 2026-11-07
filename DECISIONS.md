@@ -47,3 +47,11 @@ Les traductions en lingala et en kituba ne sont pas fournies. Aucune traduction 
 L’API sert l’édition publique avec un ETag et un cache de 60 secondes. `public/data/edition.json` reste un fichier de secours en lecture seule, produit par le Studio. Il ne remplace pas la base serveur et ne doit contenir ni brouillon, ni vote, ni signalement, ni journal d’audit. La sauvegarde complète est un export serveur téléchargeable ; sa restauration n’est pas exposée dans le Studio.
 
 Une édition publique conserve les suggestions locales encore en attente ainsi que les votes et signalements locaux lors d’une fusion. Le serveur reste prioritaire dès qu’il répond.
+
+## Carte de membre par e-mail
+
+- La demande de carte est un service distinct de l’adhésion : l’adhésion reste le groupe WhatsApp.
+- Le dossier part au bureau avant la carte. Si le dossier au bureau échoue, rien n’est enregistré et rien n’est promis.
+- Si le dossier part mais que la carte échoue, l’écran dit « dossier transmis », jamais « carte envoyée ».
+- Les adresses du bureau vivent dans `MEMBER_DOSSIER_EMAILS`, côté serveur, hors du dépôt public.
+- Aucune donnée de membre n’entre dans l’édition publique ; conservation douze mois maximum.

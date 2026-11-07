@@ -27,6 +27,15 @@ Les éléments suivants ne peuvent pas être inventés. Tant qu’ils manquent, 
 - Noms des personnes autorisées à publier dans le Studio et rôles associés.
 - Sources et crédits des images de une.
 
+## Carte de membre
+
+- Boîtes du bureau qui reçoivent chaque dossier de membre (deux adresses annoncées, à confirmer par écrit).
+- Compte d’un service d’envoi d’e-mails (API REST) et clé associée, conservée hors du dépôt.
+- Domaine expéditeur vérifié et adresse d’expédition (`MEMBER_FROM_EMAIL`).
+- Validation des mentions imprimées sur la carte (numéro, devise, statut du mouvement).
+- Durée de conservation retenue par le bureau (douze mois dans le code actuel).
+- Base légale et information des personnes pour ce traitement, à faire relire par un juriste congolais.
+
 ## Langues
 
 - Traductions validées en lingala et en kituba des pages essentielles.

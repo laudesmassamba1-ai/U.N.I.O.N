@@ -145,6 +145,17 @@ export function getDatabase(): DatabaseSync {
       user_role TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS members (
+      id TEXT PRIMARY KEY,
+      member_number TEXT UNIQUE NOT NULL,
+      full_name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      department TEXT,
+      status TEXT NOT NULL DEFAULT 'dossier_recu',
+      created_at TEXT NOT NULL,
+      card_sent_at TEXT
+    );
   `);
 
   // Initialize default settings if not present

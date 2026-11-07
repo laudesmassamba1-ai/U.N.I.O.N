@@ -9,6 +9,7 @@
 - Journal hebdomadaire avec éditions, brouillons, publication, dépublication, archivage, suppression douce et restauration.
 - Studio avec éditeur de blocs, image redimensionnée sans EXIF, sources, autosauvegarde, révisions, modération, réponses, fusion de doublons, seuils et journal d’audit.
 - Boîte à suggestions anonyme : limite de 2 dépôts par heure, preuve de travail, modération, votes, signalements, statuts.
+- Carte de membre : formulaire public, dossier envoyé au bureau par e-mail, carte envoyée au membre, conservation douze mois, aucune donnée publiée, aucune confirmation sans envoi réel.
 - Carte SVG réelle des 12 départements avec liste accessible.
 - Motion : ouverture, titre de jonction, trois scènes, carte, Charte, tampons, votes.
 - Réduction du mouvement, mode économie de données, styles d’impression, lien d’évitement.
@@ -36,6 +37,8 @@ La commande enchaîne le typecheck, les garde-fous, les tests et le build.
 ## Limites connues
 
 - SQLite est adapté au développement, pas à Vercel en production : aucun adaptateur PostgreSQL n’est écrit.
+- L’envoi des cartes exige `MAIL_API_KEY`, `MEMBER_FROM_EMAIL` et `MEMBER_DOSSIER_EMAILS` côté serveur. Sans clé, le service répond « pas encore ouvert » au lieu de confirmer un envoi.
+- Pas encore de liste des membres dans le Studio ni de renvoi de carte depuis l’interface : le bureau retrouve chaque dossier dans sa boîte e-mail.
 - Le fichier JSON de secours doit être remplacé puis redéployé pour publier sans API.
 - Pas de traduction lingala ou kituba.
 - Pas de PDF de Charte, pas de nom de Président, pas d’adresse de siège, pas de lien WhatsApp tant que le bureau ne les fournit pas.

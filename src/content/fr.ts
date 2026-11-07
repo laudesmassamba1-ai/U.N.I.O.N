@@ -18,7 +18,7 @@ export const site = {
   correctionNotice:
     'Chaque modification d’un article est datée. L’historique des versions est conservé dans le Studio.',
   privacyShort:
-    'Le site ne demande ni nom, ni e-mail, ni numéro de téléphone. Aucune donnée personnelle n’est conservée.',
+    'La boîte à suggestions reste anonyme. La carte de membre demande un nom et une adresse e-mail, utilisés uniquement pour envoyer la carte.',
 } as const;
 
 export const nav = [
@@ -31,6 +31,7 @@ export const nav = [
   { href: '/journal', label: 'Le journal' },
   { href: '/suggestions', label: 'Boîte à suggestions' },
   { href: '/rejoindre', label: 'Rejoindre' },
+  { href: '/carte', label: 'Carte de membre' },
 ] as const;
 
 export const footerNav = [
@@ -50,6 +51,7 @@ export const footerNav = [
       { href: '/journal', label: 'Infos de la semaine au Congo' },
       { href: '/suggestions', label: 'Boîte à suggestions' },
       { href: '/rejoindre', label: 'Rejoindre' },
+      { href: '/carte', label: 'Carte de membre' },
       { href: '/documents', label: 'Documents' },
       { href: '/faq', label: 'Questions fréquentes' },
     ],
@@ -473,10 +475,47 @@ export const joinPage = {
     'Le lien d’invitation au groupe WhatsApp sera publié ici.',
   privacyTitle: 'Confidentialité',
   privacyText:
-    'Le site ne collecte aucune coordonnée personnelle. Rejoindre le groupe WhatsApp s’effectue directement dans l’application WhatsApp.',
+    'Rejoindre le groupe s’effectue directement dans WhatsApp. La carte de membre demande un nom et une adresse e-mail, utilisés seulement pour transmettre le dossier et envoyer la carte.',
   commitmentTitle: 'Engagement pour l’unité',
   commitmentText:
     'L’adhésion repose sur le respect de la Charte et le refus de tout propos rabaissant une personne en raison de son origine.',
+} as const;
+
+export const memberCardPage = {
+  eyebrow: 'Carte de membre',
+  title: 'Recevoir sa carte de membre',
+  intro:
+    'Indiquez votre nom et votre adresse e-mail. Votre dossier part au bureau et votre carte vous est envoyée à cette adresse.',
+  formTitle: 'Demande de carte',
+  formHelp:
+    'Le nom, l’adresse e-mail et le département servent uniquement à établir la carte et à transmettre le dossier au bureau.',
+  nameLabel: 'Nom complet',
+  namePlaceholder: 'Prénom et nom',
+  emailLabel: 'Adresse e-mail',
+  emailPlaceholder: 'L’adresse à laquelle recevoir la carte',
+  departmentLabel: 'Département (facultatif)',
+  departmentNone: 'Ne pas préciser',
+  consentLabel:
+    'J’accepte que mon nom, mon adresse e-mail et mon département soient transmis au bureau pour établir ma carte de membre.',
+  submit: 'Demander ma carte',
+  submitting: 'Envoi en cours',
+  sentTitle: 'Carte envoyée',
+  sentText:
+    'La carte a été envoyée à l’adresse indiquée. Vérifiez aussi le dossier des indésirables.',
+  sentNoCardTitle: 'Dossier transmis',
+  sentNoCardText:
+    'Votre dossier est arrivé au bureau, mais la carte n’a pas pu être envoyée à votre adresse.',
+  numberLabel: 'Numéro de carte',
+  again: 'Demander une autre carte',
+  privacyTitle: 'Vos données',
+  privacyNote:
+    'Le site ne publie aucune donnée de membre. Le nom et l’adresse ne servent qu’à transmettre le dossier et à envoyer la carte.',
+  errors: {
+    name: 'Indiquez votre nom complet.',
+    email: 'Indiquez une adresse e-mail valide.',
+    consent: 'Cochez la case pour accepter l’envoi de la carte.',
+    network: 'L’envoi n’a pas abouti. Vérifiez votre connexion et réessayez.',
+  },
 } as const;
 
 export const documentsPage = {
@@ -547,7 +586,7 @@ export const faq = {
     },
     {
       q: 'Mes données personnelles sont-elles collectées ?',
-      a: 'Non. Le site ne demande ni nom, ni adresse e-mail, ni numéro de téléphone.',
+      a: 'La boîte à suggestions est anonyme. La demande de carte de membre demande un nom et une adresse e-mail, utilisés seulement pour transmettre le dossier au bureau et envoyer la carte. Aucune donnée de membre n’est publiée.',
     },
   ],
 } as const;
@@ -615,8 +654,8 @@ export const privacyPage = {
     {
       title: 'Ce que le site demande',
       body: [
-        'Rien : ni nom, ni adresse e-mail, ni numéro de téléphone.',
-        'La boîte à suggestions ne contient aucune colonne d’adresse IP, d’agent utilisateur ou de coordonnées personnelles.',
+        'La boîte à suggestions ne demande rien : ni nom, ni adresse e-mail, ni numéro de téléphone.',
+        'La carte de membre demande un nom complet, une adresse e-mail et, si vous le souhaitez, un département.',
         'Le site ne dépose aucun cookie publicitaire et n’emploie aucun traceur tiers.',
       ],
     },
@@ -626,6 +665,14 @@ export const privacyPage = {
         'Pour chaque suggestion déposée, le serveur enregistre uniquement : le texte de l’idée, la catégorie choisie, le département facultatif et la date de dépôt.',
         'Une épreuve de calcul réalisée sur votre appareil protège le serveur contre les envois automatisés.',
         'Une limitation en mémoire (fondée sur une empreinte temporaire réinitialisée toutes les 24 heures) empêche les envois massifs sans jamais conserver votre adresse IP en base ni dans les journaux.',
+      ],
+    },
+    {
+      title: 'La carte de membre',
+      body: [
+        'Le nom, l’adresse e-mail et le département servent à transmettre votre dossier au bureau et à vous envoyer votre carte.',
+        'Le dossier part au bureau par e-mail. La carte part à l’adresse que vous indiquez. Le prestataire d’envoi reçoit ces informations pour effectuer la livraison.',
+        'Le serveur conserve ces informations douze mois au maximum. Aucune donnée de membre n’est publiée sur le site. Le département reste facultatif.',
       ],
     },
     {

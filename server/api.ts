@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { getDatabase } from './db';
 import {
+  checkMemberRateLimit,
   checkRateLimit,
   createStudioSession,
   getSecurityHeaders,
@@ -13,11 +14,14 @@ import {
   verifyProofOfWork,
 } from './security';
 import {
+  validateMemberInput,
   validateReportInput,
   validateSuggestionInput,
   validateVoteInput,
   ValidationException,
 } from './validator';
+import { buildMemberCard, buildMemberDossier, createMemberNumber } from './member-card';
+import { dossierRecipients, isMailConfigured, sendMail } from './mail';
 import { analyseSuggestion } from '../src/lib/moderation';
 import { DEFAULT_SETTINGS, evaluateStatus } from '../src/lib/suggestions';
 
@@ -372,6 +376,111 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         .run(now, input.suggestionId);
 
       sendJson(res, 201, { ok: true, reportId });
+      return true;
+    }
+
+    // 5b. POST /api/v1/members — dossier de membre, carte envoyée par e-mail
+    if (method === 'POST' && pathname === '/api/v1/members') {
+      if (!isMailConfigured() || dossierRecipients().length === 0) {
+        sendJson(res, 503, {
+          error:
+            'Le service de carte de membre n’est pas encore ouvert. Le groupe WhatsApp reste le canal du mouvement.',
+        });
+        return true;
+      }
+
+      const memberRateCheck = checkMemberRateLimit(clientIp);
+      if (!memberRateCheck.allowed) {
+        sendJson(res, 429, {
+          error: 'Trop de demandes depuis cette connexion. Réessayez dans une heure.',
+          retryAfter: memberRateCheck.retryAfterSeconds,
+        });
+        return true;
+      }
+
+      const body = await readJsonBody(req);
+      const input = validateMemberInput(body);
+      const now = new Date();
+      const issuedAt = now.toISOString();
+      const memberNumber = createMemberNumber(now);
+
+      // 1. Le dossier part au bureau. Sans ce courriel, rien n’est enregistré.
+      const dossier = buildMemberDossier({
+        fullName: input.fullName,
+        email: input.email,
+        department: input.department,
+        memberNumber,
+        issuedAt,
+      });
+      const bureauSend = await sendMail({
+        to: dossierRecipients(),
+        subject: dossier.subject,
+        html: dossier.html,
+        text: dossier.text,
+        replyTo: input.email,
+      });
+      if (!bureauSend.ok) {
+        sendJson(res, 502, {
+          error: 'Le dossier n’a pas pu être transmis au bureau. Aucune carte n’a été délivrée.',
+        });
+        return true;
+      }
+
+      db.prepare(
+        'INSERT INTO members (id, member_number, full_name, email, department, status, created_at, card_sent_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      ).run(
+        `member-${crypto.randomUUID()}`,
+        memberNumber,
+        input.fullName,
+        input.email,
+        input.department,
+        'dossier_recu',
+        issuedAt,
+        null,
+      );
+
+      // Conservation maximale de 12 mois, aucune donnée publiée.
+      db.prepare('DELETE FROM members WHERE created_at < ?').run(
+        new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString(),
+      );
+
+      // 2. La carte part au membre.
+      const card = buildMemberCard({
+        fullName: input.fullName,
+        memberNumber,
+        department: input.department,
+        issuedAt,
+      });
+      const cardSend = await sendMail({
+        to: [input.email],
+        subject: card.subject,
+        html: card.html,
+        text: card.text,
+      });
+
+      if (!cardSend.ok) {
+        sendJson(res, 202, {
+          ok: true,
+          cardSent: false,
+          memberNumber,
+          message:
+            'Votre dossier est arrivé au bureau, mais la carte n’a pas pu être envoyée à votre adresse.',
+        });
+        return true;
+      }
+
+      db.prepare('UPDATE members SET status = ?, card_sent_at = ? WHERE member_number = ?').run(
+        'carte_envoyee',
+        issuedAt,
+        memberNumber,
+      );
+
+      sendJson(res, 201, {
+        ok: true,
+        cardSent: true,
+        memberNumber,
+        message: 'Votre dossier est arrivé au bureau et votre carte a été envoyée.',
+      });
       return true;
     }
 

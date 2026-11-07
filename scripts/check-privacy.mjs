@@ -95,6 +95,29 @@ if (!suggestionsComponent.includes('api.submitSuggestion')) {
   fail('Suggestions.tsx : aucune transmission serveur trouvée avant confirmation.');
 }
 
+// 6. Carte de membre : données personnelles côté serveur, jamais dans l’édition publique.
+const memberSchema = readFileSync(dbSchemaFile, 'utf8');
+if (!/CREATE TABLE IF NOT EXISTS members[\s\S]*?email TEXT NOT NULL/.test(memberSchema)) {
+  fail('server/db.ts : la table members doit exister et contenir l’adresse e-mail côté serveur.');
+}
+
+const apiSource = readFileSync(path.join(root, 'server/api.ts'), 'utf8');
+if (!/api\/v1\/members/.test(apiSource)) {
+  fail('server/api.ts : route /api/v1/members absente.');
+}
+const editionStart = apiSource.indexOf("pathname === '/api/v1/edition'");
+const suggestionsStart = apiSource.indexOf("pathname === '/api/v1/suggestions'");
+if (editionStart === -1 || suggestionsStart === -1 || suggestionsStart < editionStart) {
+  fail('server/api.ts : section de l’édition publique introuvable.');
+} else if (/members/.test(apiSource.slice(editionStart, suggestionsStart))) {
+  fail('La réponse publique /api/v1/edition mentionne la table members.');
+}
+
+const memberPage = readFileSync(path.join(root, 'src/pages/MemberCard.tsx'), 'utf8');
+if (!/api\.requestMemberCard\(/.test(memberPage)) {
+  fail('src/pages/MemberCard.tsx : la carte n’est confirmée qu’après un appel serveur.');
+}
+
 if (failures > 0) {
   console.error(`\nVie privée : ${failures} problème(s).`);
   process.exit(1);
