@@ -73,6 +73,7 @@ jobs:
       - name: Dump
         run: |
           pg_dump "$DATABASE_URL_BACKUP_RO" \
+            --schema=public --schema=drizzle \
             --format=custom --no-owner --no-privileges \
             --file=union.dump
           test -s union.dump
