@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from '../components/Link';
 import { PageHeader } from '../components/Layout';
-import { Container, Section, StatusStamp } from '../components/ui';
+import { Container, Section, SectionHead, StatusStamp } from '../components/ui';
 import { departments, memberCardPage } from '../content/fr';
 import { api } from '../lib/api';
 import { useRouteTitle } from '../lib/hooks';
@@ -34,6 +34,7 @@ export default function MemberCard() {
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
+    setUnavailable(false);
 
     if (fullName.trim().length < 2) {
       setError(memberCardPage.errors.name);
@@ -85,6 +86,7 @@ export default function MemberCard() {
 
       <Section className="home-roadmap" motion="carte-etapes">
         <Container>
+          <SectionHead eyebrow={memberCardPage.eyebrow} title={memberCardPage.stepsTitle} />
           <div className="roadmap-grid" data-reveal>
             {memberCardPage.steps.map((step, index) => (
               <div key={step.title} className="roadmap-step">

@@ -41,8 +41,8 @@ export default function Home({ motionAllowed }: { motionAllowed: boolean }) {
   useEffect(() => {
     let alive = true;
     api.getRoadmap().then((res) => {
-      if (alive && res?.steps?.length > 0) {
-        setRoadmapSteps(res.steps);
+      if (alive && Array.isArray(res?.steps) && res.steps.length > 0) {
+        setRoadmapSteps([...res.steps].sort((a, b) => a.stepOrder - b.stepOrder));
       }
     }).catch(() => undefined);
     return () => {

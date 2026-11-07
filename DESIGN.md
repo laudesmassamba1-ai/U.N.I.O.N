@@ -25,6 +25,8 @@ La couleur n’est jamais seule : chaque statut porte un libellé et une forme (
 - **Bitter** pour les titres, les chiffres et les citations. Graisse 800, interlignage serré, `text-wrap: balance`.
 - **Public Sans** pour le texte courant et l’interface. 18 px de base, largeur de ligne limitée à 62 caractères.
 
+Les deux familles sont chargées une seule fois, depuis `index.html`, avec les graisses réellement utilisées : Bitter 400, 600, 700, 800, 900 et italique 400 ; Public Sans 400 à 800. La graisse 800 de Bitter n’est pas synthétisée, elle est téléchargée. Les paragraphes utilisent `text-wrap: pretty`, les titres `text-wrap: balance`, et les chiffres alignés (compteurs, dates, numéros d’étape) sont en chiffres tabulaires.
+
 ## Grille et espace
 
 - Largeur maximale : 1280 px.
@@ -42,6 +44,9 @@ La couleur n’est jamais seule : chaque statut porte un libellé et une forme (
 - `ArticleCard` : numéro d’édition, nature, titre, résumé.
 - `DepartmentMap` : tracés SVG réels, étiquettes et liste équivalente.
 - `ButtonLink` : quatre variantes, toutes avec contour visible au focus.
+- `ReadProgress` : filet vert de 3 px fixé au bord supérieur, dont la largeur suit la position de défilement. Il ne capte aucun clic et disparaît à l’impression.
+
+Sous un pointeur fin, les boutons se déplacent d’un pixel et la flèche avance de trois ; les images de carte grossissent de 2 % dans un cadre coupé. Aucune de ces réponses ne porte d’information et toutes disparaissent en mouvement réduit.
 
 ## Accessibilité visuelle
 

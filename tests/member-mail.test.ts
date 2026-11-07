@@ -24,6 +24,17 @@ describe('dossier par messagerie', () => {
     expect(body).toContain('carte de membre');
   });
 
+  it('marque le nom à compléter quand le champ est vide', () => {
+    const link = buildDossierMailto(['bureau@example.com'], {
+      fullName: '   ',
+      department: '',
+      issuedAt: '2026-11-07T00:00:00.000Z',
+    });
+    const body = decodeURIComponent(link.split('&body=')[1]);
+    expect(body).toContain('Nom : (à compléter)');
+    expect(body).toContain('Département : Non précisé');
+  });
+
   it('ne construit rien sans destinataire', () => {
     expect(buildDossierMailto([], { fullName: 'Awa', department: null })).toBe('');
     expect(buildDossierMailto(['invalide'], { fullName: 'Awa', department: null })).toBe('');

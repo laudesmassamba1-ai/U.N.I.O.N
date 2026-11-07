@@ -9,6 +9,10 @@
 - Journal hebdomadaire avec éditions, brouillons, publication, dépublication, archivage, suppression douce et restauration.
 - Studio avec éditeur de blocs, image redimensionnée sans EXIF, sources, autosauvegarde, révisions, modération, réponses, fusion de doublons, seuils et journal d’audit.
 - Boîte à suggestions anonyme : limite de 2 dépôts par heure, preuve de travail, modération, votes, signalements, statuts.
+- Typographie : une seule requête de polices, graisse 800 de Bitter réellement chargée, chiffres tabulaires, veuves évitées, thème appliqué avant le premier rendu.
+- Interface : filet de lecture en haut de page, en-têtes d’ancrage sous l’en-tête fixe, focus rendu au contenu après chaque navigation.
+- Mouvement : tampons posés à l’entrée dans le champ, joint de la jonction piloté par le défilement, réponses au survol réservées aux pointeurs fins et coupées en mouvement réduit.
+- Logique : feuille de route triée par ordre d’étape, thème initial qui suit le système, département vide traité comme absent dans le dossier de membre.
 - Carte de membre : page en trois étapes, formulaire public, dossier envoyé au bureau par e-mail, carte envoyée au membre, conservation douze mois, aucune donnée publiée, aucune confirmation sans envoi réel.
 - Second chemin sans serveur : un lien de messagerie pré-rempli vers les deux boîtes du bureau, utile quand le site est servi en statique. Le site indique qu’il ne peut pas vérifier cet envoi.
 - Carte SVG réelle des 12 départements avec liste accessible.

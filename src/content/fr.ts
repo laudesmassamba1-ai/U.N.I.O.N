@@ -486,6 +486,7 @@ export const memberCardPage = {
   title: 'Recevoir sa carte de membre',
   intro:
     'Indiquez votre nom et votre adresse e-mail. Votre dossier part au bureau et votre carte vous est envoyée à cette adresse.',
+  stepsTitle: 'Comment ça marche',
   steps: [
     {
       title: 'Vous remplissez',

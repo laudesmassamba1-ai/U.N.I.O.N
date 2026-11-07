@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Bitter:wght@300..900&family=Public+Sans:wght@300..800&display=swap');
-
 :root {
   --ink: #0b0b0b;
   --ink-soft: #2b2b28;
@@ -40,6 +38,10 @@
   --yellow-soft: #332c08;
   --red-ink: #f09b98;
   --red-soft: #341a19;
+}
+
+html[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 *,
@@ -103,6 +105,22 @@ p:last-child {
   margin-bottom: 0;
 }
 
+p {
+  text-wrap: pretty;
+}
+
+:where(h1, h2, h3, h4, [id]) {
+  scroll-margin-top: calc(var(--header-height) + 1.5rem);
+}
+
+.facts__grid,
+.article-meta,
+.article-card__meta,
+.journal-archive,
+.roadmap-step__num {
+  font-variant-numeric: tabular-nums;
+}
+
 a {
   color: inherit;
 }
@@ -161,6 +179,30 @@ button {
 
 .skip-link:focus {
   transform: translateY(0);
+}
+
+/* Filet de lecture : la page se remplit comme une marge annotée. */
+.read-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 3px;
+  z-index: 120;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.read-progress[data-active='true'] {
+  opacity: 1;
+}
+
+.read-progress__fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform: scaleX(var(--read, 0));
+  transform-origin: 0 50%;
+  background: var(--green);
 }
 
 .container {
@@ -269,7 +311,8 @@ button {
   line-height: 1.2;
   text-decoration: none;
   text-align: center;
-  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease,
+    transform 160ms ease;
 }
 
 .button--solid {
@@ -305,9 +348,34 @@ button {
 }
 
 .arrow {
+  display: inline-block;
   font-family: var(--font-sans);
   font-size: 1rem;
   line-height: 1;
+  transition: transform 180ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .button:hover {
+    transform: translateY(-1px);
+  }
+
+  .button:active {
+    transform: translateY(0);
+  }
+
+  .button:hover .arrow {
+    transform: translateX(3px);
+  }
+
+  .article-card:hover .article-card__image {
+    transform: scale(1.02);
+  }
+
+  .article-card:hover .article-card__title a {
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
+  }
 }
 
 .badge {
@@ -1938,6 +2006,7 @@ button {
   display: block;
   text-decoration: none;
   margin-bottom: 0.9rem;
+  overflow: hidden;
 }
 
 .article-card__image {
@@ -1946,6 +2015,7 @@ button {
   aspect-ratio: 16 / 9;
   object-fit: cover;
   background: var(--paper-2);
+  transition: transform 520ms cubic-bezier(0.2, 0.75, 0.2, 1);
 }
 
 .article-card__typographic {
@@ -3430,6 +3500,27 @@ button {
   transition: opacity 650ms ease, transform 650ms cubic-bezier(0.2, 0.75, 0.2, 1);
 }
 
+/* Le tampon se pose sur la page au lieu d’apparaître. */
+.js .stamp[data-reveal] {
+  opacity: 1;
+  transform: none;
+}
+
+.js .stamp[data-reveal].is-visible {
+  animation: stamp-in 420ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
+}
+
+.reduce-motion .js .stamp[data-reveal].is-visible,
+.data-saver .js .stamp[data-reveal].is-visible {
+  animation: none;
+}
+
+.js .junction__seam {
+  transform-origin: 50% 100%;
+  transform: translateY(0.03em) scaleY(calc(0.55 + 0.45 * var(--p, 0)));
+  opacity: calc(0.35 + 0.65 * var(--p, 0));
+}
+
 .js .charter-article[data-reveal] {
   opacity: 1;
   transform: none;
@@ -4243,6 +4334,7 @@ button {
 }
 
 @media print {
+  .read-progress,
   .site-header,
   .site-footer,
   .skip-link,

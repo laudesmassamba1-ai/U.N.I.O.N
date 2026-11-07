@@ -154,6 +154,10 @@ export function useDisplayPreferences(): DisplayPreferences {
     return Boolean(connection?.saveData);
   });
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof document !== 'undefined') {
+      const applied = document.documentElement.dataset.theme;
+      if (applied === 'dark' || applied === 'light') return applied;
+    }
     if (typeof window === 'undefined') return 'light';
     try {
       const saved = window.localStorage.getItem('union.theme');
@@ -161,7 +165,7 @@ export function useDisplayPreferences(): DisplayPreferences {
     } catch {
       // ignore
     }
-    return 'light';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
 
   useEffect(() => {
@@ -176,6 +180,8 @@ export function useDisplayPreferences(): DisplayPreferences {
     document.documentElement.dataset.theme = theme;
     document.documentElement.classList.toggle('data-saver', dataSaver);
     document.documentElement.classList.toggle('reduce-motion', reducedMotion);
+    const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (themeColor) themeColor.content = theme === 'dark' ? '#0b0b0b' : '#ffffff';
     try {
       window.localStorage.setItem('union.theme', theme);
       window.localStorage.setItem('union.dataSaver', dataSaver ? 'on' : 'off');

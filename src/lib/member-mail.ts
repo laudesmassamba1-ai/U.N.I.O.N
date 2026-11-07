@@ -21,14 +21,16 @@ export function buildDossierMailto(recipients: string[], input: DossierMailInput
   const date = input.issuedAt
     ? new Date(input.issuedAt).toLocaleDateString('fr-FR', { timeZone: 'Africa/Brazzaville' })
     : new Date().toLocaleDateString('fr-FR', { timeZone: 'Africa/Brazzaville' });
-  const subject = `Demande de carte de membre — ${input.fullName}`;
+  const name = input.fullName.trim() || '(à compléter)';
+  const department = (input.department ?? '').trim() || 'Non précisé';
+  const subject = `Demande de carte de membre — ${name}`;
   const body = [
     'Bonjour,',
     '',
     'Je souhaite recevoir ma carte de membre de l’U.N.I.O.N.',
     '',
-    `Nom : ${input.fullName}`,
-    `Département : ${input.department ?? 'Non précisé'}`,
+    `Nom : ${name}`,
+    `Département : ${department}`,
     `Date : ${date}`,
     '',
     'Merci.',

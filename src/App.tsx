@@ -1,5 +1,6 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Footer, Header } from './components/Layout';
+import { ReadProgress } from './components/ReadProgress';
 import { InkFilter } from './components/InkFilter';
 import { Opening } from './components/Opening';
 import { useDatabase, useDisplayPreferences, useEditionSync, useRevealOnScroll, useRoute, useScrollToTopOnRoute } from './lib/hooks';
@@ -64,7 +65,18 @@ export default function App() {
   useRevealOnScroll(route.path);
   useScrollToTopOnRoute(route.path);
   const database = useDatabase();
+  const mainRef = useRef<HTMLElement>(null);
+  const firstRoute = useRef(true);
   const [openingDone, setOpeningDone] = useState(() => route.path !== '/');
+
+  /* Après une navigation, le focus revient au contenu plutôt qu’au corps du document. */
+  useEffect(() => {
+    if (firstRoute.current) {
+      firstRoute.current = false;
+      return;
+    }
+    mainRef.current?.focus({ preventScroll: true });
+  }, [route.path]);
 
   useEffect(() => {
     if (!isHome) setOpeningDone(true);
@@ -127,7 +139,8 @@ export default function App() {
         Aller au contenu
       </a>
       <Header />
-      <main id="main" tabIndex={-1}>
+      <ReadProgress />
+      <main id="main" tabIndex={-1} ref={mainRef}>
         <Suspense fallback={<p className="loading">Chargement de la page.</p>}>
           <RouteView path={route.path} motionAllowed={preferences.motionAllowed} />
         </Suspense>

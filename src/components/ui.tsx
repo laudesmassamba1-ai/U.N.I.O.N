@@ -120,7 +120,7 @@ export function StatusStamp({
   tone?: 'neutral' | 'validated' | 'attention' | 'closed';
 }) {
   return (
-    <span className={`stamp stamp--${tone}`} data-stamp="true">
+    <span className={`stamp stamp--${tone}`} data-stamp="true" data-reveal>
       {label}
     </span>
   );
